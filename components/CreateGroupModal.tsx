@@ -2,12 +2,13 @@
 
 import { useState } from 'react';
 import axios from 'axios';
-import { X, Users } from 'lucide-react';
+import { X, Users, AlignLeft, ArrowRight } from 'lucide-react';
+import api from '../lib/api';
 
 interface CreateGroupModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: () => void; // Trigger a feed refresh after creation
 }
 
 export default function CreateGroupModal({ isOpen, onClose, onSuccess }: CreateGroupModalProps) {
@@ -20,78 +21,101 @@ export default function CreateGroupModal({ isOpen, onClose, onSuccess }: CreateG
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) return;
-
     setIsLoading(true);
     setError('');
 
     try {
-      const token = localStorage.getItem('family_app_token');
-      await axios.post(
-        `${process.env.NEXT_PUBLIC_API_URL}/groups/`,
-        { name, description },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
+      await api.post('/silos/', { name, description });
+      
       setName('');
       setDescription('');
-      onSuccess(); // Tells the parent to refresh the sidebar
+      onSuccess();
       onClose();
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to create group');
+      setError(err.response?.data?.detail || 'Failed to create Silo');
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-blue-900/20 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white/90 backdrop-blur-xl border border-white/50 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+    // The Backdrop: Heavy blur overlay, clickable to close
+    <div 
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-[#191c1e]/30 backdrop-blur-md transition-all"
+      onClick={onClose}
+    >
+      
+      {/* The Modal: Pure white, rounded-[3rem], massive ambient shadow. onClick stopPropagation prevents closing when clicking inside the modal */}
+      <div 
+        className="w-full max-w-[440px] bg-white p-10 rounded-[3rem] shadow-[0_40px_80px_rgba(25,28,30,0.15)] relative border-none"
+        onClick={(e) => e.stopPropagation()}
+      >
         
-        <div className="flex justify-between items-center p-5 border-b border-gray-100">
-          <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-            <Users size={20} className="text-blue-600" />
-            Create New Silo
-          </h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded-full hover:bg-gray-100">
-            <X size={20} />
-          </button>
+        {/* Close Button */}
+        <button 
+          onClick={onClose}
+          className="absolute top-6 right-6 w-10 h-10 bg-[#f2f4f6] text-[#777587] rounded-full flex items-center justify-center hover:bg-[#e0e3e5] hover:text-[#191c1e] transition-colors"
+        >
+          <X size={20} strokeWidth={2.5} />
+        </button>
+
+        <div className="mb-8 pr-8">
+          <h2 className="text-3xl font-extrabold text-[#191c1e] tracking-tight mb-2" style={{ fontFamily: '"Plus Jakarta Sans", sans-serif' }}>
+            Create a New Silo
+          </h2>
+          <p className="text-[#464555] font-medium text-sm leading-relaxed" style={{ fontFamily: '"Plus Jakarta Sans", sans-serif' }}>
+            Set up a secure, private space for a specific group of family or friends.
+          </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-5">
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">Silo Name</label>
-            <input
-              type="text"
-              required
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full px-4 py-2.5 bg-gray-50/50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all outline-none"
-              placeholder="e.g. The Smith Family"
-            />
+        <form onSubmit={handleSubmit} className="space-y-5">
+          
+          <div className="space-y-1.5">
+            <label className="block text-sm font-bold text-[#464555] ml-1" style={{ fontFamily: '"Manrope", sans-serif' }}>Silo Name</label>
+            <div className="relative group">
+              <input
+                type="text"
+                required
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="w-full px-5 py-4 pl-12 bg-[#f2f4f6] border-none rounded-xl focus:ring-2 focus:ring-[#0434c6]/20 focus:bg-[#f7f9fb] transition-all text-[#191c1e] outline-none font-medium placeholder-[#777587]"
+                placeholder="e.g. The Miller Family"
+              />
+              <Users size={20} className="absolute left-4 top-4 text-[#777587]" />
+            </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">Description (Optional)</label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={3}
-              className="w-full px-4 py-2.5 bg-gray-50/50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all outline-none resize-none"
-              placeholder="What is this space for?"
-            />
+          <div className="space-y-1.5">
+            <label className="block text-sm font-bold text-[#464555] ml-1" style={{ fontFamily: '"Manrope", sans-serif' }}>Short Description</label>
+            <div className="relative group">
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={3}
+                className="w-full px-5 py-4 pl-12 bg-[#f2f4f6] border-none rounded-xl focus:ring-2 focus:ring-[#0434c6]/20 focus:bg-[#f7f9fb] transition-all text-[#191c1e] outline-none font-medium placeholder-[#777587] resize-none"
+                placeholder="A place for our Thanksgiving recipes and summer trip photos..."
+              />
+              <AlignLeft size={20} className="absolute left-4 top-4 text-[#777587]" />
+            </div>
           </div>
 
-          {error && <p className="text-red-500 text-sm bg-red-50 p-3 rounded-lg border border-red-100">{error}</p>}
+          {error && (
+            <div className="text-[#93000a] text-sm text-center bg-[#ffdad6] p-3 rounded-xl font-bold border-none mt-2">
+              {error}
+            </div>
+          )}
 
           <button
             type="submit"
-            disabled={isLoading || !name.trim()}
-            className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white py-3 px-4 rounded-xl font-semibold shadow-md shadow-blue-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed transform hover:-translate-y-0.5"
+            disabled={isLoading || !name}
+            className="w-full py-4 mt-4 bg-gradient-to-br from-[#0434c6] to-[#3050de] text-white font-extrabold rounded-full shadow-[0_10px_25px_rgba(4,52,198,0.25)] hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50 border-none"
+            style={{ fontFamily: '"Plus Jakarta Sans", sans-serif' }}
           >
             {isLoading ? 'Creating...' : 'Create Silo'}
+            {!isLoading && <ArrowRight size={18} />}
           </button>
         </form>
+
       </div>
     </div>
   );

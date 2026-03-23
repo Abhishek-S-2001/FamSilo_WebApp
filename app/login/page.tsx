@@ -22,28 +22,64 @@ export default function AuthPage() {
   const [password, setPassword] = useState('');
   const [username, setUsername] = useState('');
 
-  const handleSubmit = async (e: React.FormEvent) => {
+const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    setErrorMessage('');
+    setErrorMessage(''); // Clear old errors
+
+    if (!isLogin) {
+      // Regex: 3-20 characters, only letters, numbers, and underscores
+      const usernameRegex = /^[a-zA-Z0-9_]{3,20}$/;
+      if (!usernameRegex.test(username)) {
+        setErrorMessage('Username must be 3-20 characters and contain only letters, numbers, and underscores (no spaces).');
+        setIsLoading(false);
+        return; // Stops the form from submitting!
+      }
+    }
 
     const apiUrl = process.env.NEXT_PUBLIC_API_URL;
 
     try {
       let response;
       if (isLogin) {
-        response = await axios.post(`${apiUrl}/auth/login`, { email, password });
+        response = await axios.post(`${apiUrl}/auth/login`, { identifier: email, password });
       } else {
         response = await axios.post(`${apiUrl}/auth/signup`, { email, password, username });
+        
+        if (!response.data.access_token) {
+          response = await axios.post(`${apiUrl}/auth/login`, { email, password });
+        }
       }
 
       const { access_token } = response.data;
+      
+      if (!access_token) {
+        throw new Error("Failed to retrieve access token.");
+      }
+
       localStorage.setItem('family_app_token', access_token);
-      router.push('/');
+      
+      const pendingInviteToken = sessionStorage.getItem('pending_invite_token');
+      
+      if (pendingInviteToken) {
+        sessionStorage.removeItem('pending_invite_token'); 
+        window.location.href = `/join?token=${pendingInviteToken}`;
+      } else {
+        window.location.href = '/';
+      }
       
     } catch (error: any) {
-      const message = error.response?.data?.detail || 'Something went wrong. Please try again.';
+      // 1. Next.js will still log this in the console, which is normal for dev!
+      console.log("This error",error);
+      console.error("Auth Request Failed:", error?.response?.status); 
+      
+      
+      // 2. Extract the exact error message your Python backend sent over
+      const message = error.response?.data?.detail || 'Invalid email or password. Please try again.';
+      
+      // 3. Set it to your React state so the user sees it!
       setErrorMessage(typeof message === 'string' ? message : JSON.stringify(message));
+      
     } finally {
       setIsLoading(false);
     }
@@ -166,15 +202,17 @@ export default function AuthPage() {
 
               {/* Email Input */}
               <div className="space-y-1.5">
-                <label className="block text-sm font-bold text-[#464555] ml-1" style={{ fontFamily: '"Manrope", sans-serif' }}>Email</label>
+                <label className="block text-sm font-bold text-[#464555] ml-1" style={{ fontFamily: '"Manrope", sans-serif' }}>
+                  {isLogin ? "Email or Username" : "Email Address"}
+                </label>
                 <div className="relative group">
                   <input
-                    type="email"
+                    type={isLogin ? "text" : "email"}
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className="w-full px-5 py-3.5 pl-12 bg-white/50 border-none rounded-xl focus:ring-2 focus:ring-[#0434c6]/50 focus:bg-white transition-all text-[#191c1e] outline-none font-medium placeholder-[#777587]"
-                    placeholder="name@family.com"
+                    placeholder={isLogin ? "sarah_miller OR name@family.com" : "name@family.com"}
                   />
                   <Mail size={18} className="absolute left-4 top-4 text-[#777587]" />
                 </div>
