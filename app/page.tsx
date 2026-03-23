@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Analytics } from '@vercel/analytics/next';
+import { SpeedInsights } from '@vercel/speed-insights/next';
 import TopNavbar from '@/components/TopNavbar';
 import Sidebar from '@/components/Sidebar';
 import SiloChatPanel from '@/components/SiloChatPanel';
@@ -138,6 +139,7 @@ export default function DashboardPage() {
 
       </main>
       <Analytics />
+      <SpeedInsights />
     </div>
   );
 }
