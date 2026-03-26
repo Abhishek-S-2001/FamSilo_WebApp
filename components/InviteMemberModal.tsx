@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { X, Mail, ArrowRight, UserPlus, Search, User as UserIcon, CheckCircle2 } from 'lucide-react';
-import api from '../lib/api';
+import api from '../lib/axios';
 
 interface InviteMemberModalProps {
   isOpen: boolean;

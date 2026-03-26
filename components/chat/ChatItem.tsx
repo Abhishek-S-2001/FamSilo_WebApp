@@ -1,15 +1,19 @@
 'use client';
 
+// 1. Extract and export the specific chat data shape
+export interface ChatData {
+  id: string;
+  name: string;
+  type: 'dm' | 'group';
+  avatar?: string;
+  last_message_preview?: string;
+  last_message_time?: string;
+  unread_count?: number;
+}
+
+// 2. Tell ChatItemProps to use that new interface
 interface ChatItemProps {
-  chat: {
-    id: string;
-    name: string;
-    type: 'dm' | 'group';
-    avatar?: string;
-    last_message_preview?: string;
-    last_message_time?: string;
-    unread_count?: number;
-  };
+  chat: ChatData; 
   onClick: (id: string) => void;
   size?: 'md' | 'sm';
 }

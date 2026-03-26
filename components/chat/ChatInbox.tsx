@@ -1,17 +1,48 @@
 'use client';
 
 import { Search } from 'lucide-react';
-import ChatItem from './ChatItem';
+import useSWR from 'swr';
+import api from '@/lib/axios';
+
+// 1. Import the EXACT type from ChatItem so they never get out of sync
+import ChatItem, { ChatData } from './ChatItem'; 
+
+// 2. Import the global brain so clicking a chat actually opens it!
+import { useChat } from '@/lib/context/ChatContext';
 
 interface ChatInboxProps {
-  chats: any[];
-  onSelectChat: (id: string) => void;
+  chats?: ChatData[]; // Strictly typed array!
+  onSelectChat?: (id: string) => void; // Made optional
 }
 
-export default function ChatInbox({ chats, onSelectChat }: ChatInboxProps) {
+const fetcher = (url: string) => api.get(url).then(r => r.data);
+
+export default function ChatInbox({ chats: propChats, onSelectChat }: ChatInboxProps) {
+  // Grab the global action to open a chat
+  const { openChatWith } = useChat();
+
+  // Only fetch if no chats were passed as props
+  const { data: fetchedChats = [] } = useSWR(
+    propChats === undefined ? '/chat/inbox' : null,
+    fetcher,
+    { revalidateOnFocus: true, refreshInterval: 15000 }
+  );
+
+  const chats = propChats ?? fetchedChats;
+
+  // 3. The Click Handler Logic
+  const handleChatClick = (chat: ChatData) => {
+    if (onSelectChat) {
+      // If a parent provided a custom click handler, use it
+      onSelectChat(chat.id); 
+    } else {
+      // Otherwise, tell the Global wrapper to open this DM/Silo!
+      openChatWith(chat.id, chat.name); 
+    }
+  };
+
   return (
-    <div className="col-span-1 md:col-span-4 lg:col-span-3 w-full h-full md:h-[calc(100vh-8rem)] bg-white md:rounded-[3rem] shadow-[0_20px_60px_rgba(25,28,30,0.15)] border border-[#f2f4f6] flex flex-col overflow-hidden relative">
-      
+    <div className="w-full h-full bg-white flex flex-col overflow-hidden">
       {/* Header */}
       <div className="p-6 pb-4 flex items-center justify-between border-b border-[#f2f4f6]">
         <h3 className="text-lg font-extrabold text-[#191c1e]" style={{ fontFamily: '"Plus Jakarta Sans", sans-serif' }}>
@@ -27,8 +58,13 @@ export default function ChatInbox({ chats, onSelectChat }: ChatInboxProps) {
         {chats.length === 0 ? (
           <p className="text-center text-[#b5b3c3] text-sm font-bold mt-10">Your inbox is empty.</p>
         ) : (
-          chats.map(chat => (
-            <ChatItem key={chat.id} chat={chat} onClick={onSelectChat} size="md" />
+          chats.map((chat: ChatData) => (
+            <ChatItem 
+              key={chat.id} 
+              chat={chat} 
+              onClick={() => handleChatClick(chat)} // Pass the whole object to our smart handler
+              size="md" 
+            />
           ))
         )}
       </div>

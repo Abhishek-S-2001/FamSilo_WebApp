@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { X, Save } from 'lucide-react';
-import api from '@/lib/api';
+import api from '@/lib/axios';
 
 interface EditProfileModalProps {
   profile: any;

@@ -3,7 +3,7 @@
 import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
-import api from '@/lib/api';
+import api from '@/lib/axios';
 
 // We wrap the component in Suspense because we are reading URL parameters
 function JoinHandler() {

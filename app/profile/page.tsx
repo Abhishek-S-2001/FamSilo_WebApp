@@ -1,10 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import TopNavbar from '@/components/TopNavbar';
 import Sidebar from '@/components/Sidebar';
-import SiloChatPanel from '@/components/chat/SiloChatPanel';
 import ViewProfileModal from '@/components/ViewProfileModal';
 import ProfileHero from '@/components/profile/ProfileHero';
 import ProfileAbout from '@/components/profile/ProfileAbout';
@@ -13,13 +11,12 @@ import ProfileStatsBar from '@/components/profile/ProfileStatsBar';
 import EditProfileModal from '@/components/profile/EditProfileModal';
 import ImageCropModal from '@/components/profile/ImageCropModal';
 import { useProfile } from '@/lib/hooks/useProfile';
-import { useUnreadMessages } from '@/lib/hooks/useUnreadMessages';
-import { MessageCircle, X } from 'lucide-react';
-import api from '@/lib/api';
+import api from '@/lib/axios';
+import { useChat } from '@/lib/context/ChatContext';
 
 export default function ProfilePage() {
   const { profile, stats, silosList, membersList, isLoading, mutate } = useProfile();
-  const { hasUnread } = useUnreadMessages();
+  const { openChatWith } = useChat();
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [viewProfileId, setViewProfileId] = useState<string | null>(null);
@@ -27,9 +24,6 @@ export default function ProfilePage() {
 
   const [cropModal, setCropModal] = useState<{ image: string; type: 'avatar' | 'cover' } | null>(null);
 
-  const [isGlobalChatOpen, setIsGlobalChatOpen] = useState(false);
-  const [activeDmId, setActiveDmId] = useState<string | null>(null);
-  const [activeDmName, setActiveDmName] = useState<string | null>(null);
 
   // Handle file selection → open cropper
   const onFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'avatar' | 'cover') => {
@@ -54,12 +48,12 @@ export default function ProfilePage() {
     }
   };
 
-  const handleStartDM = (peerId: string, peerName: string) => {
+const handleStartDM = (peerId: string, peerName: string) => {
     if (!profile?.id) return;
     const ids = [profile.id, peerId].sort();
-    setActiveDmId(`dm_${ids[0]}_${ids[1]}`);
-    setActiveDmName(peerName);
-    setIsGlobalChatOpen(true);
+    const dmRoomId = `dm_${ids[0]}_${ids[1]}`;
+    
+    openChatWith(dmRoomId, peerName); 
   };
 
   if (isLoading) {
@@ -124,30 +118,6 @@ export default function ProfilePage() {
           </div>
         </section>
       </main>
-
-      {/* Floating Chat */}
-      {isGlobalChatOpen && (
-        <div className="fixed top-24 right-8 w-full max-w-[400px] z-[60] shadow-2xl rounded-[3rem] animate-in slide-in-from-right-8 duration-300">
-          <SiloChatPanel isGlobal={true} preSelectedChatId={activeDmId} preSelectedChatName={activeDmName} />
-        </div>
-      )}
-
-      <button
-        onClick={() => { setIsGlobalChatOpen(o => !o); setActiveDmId(null); }}
-        className="fixed bottom-8 right-8 w-14 h-14 bg-[#0434c6] rounded-full shadow-[0_10px_40px_rgba(4,52,198,0.4)] flex items-center justify-center text-white hover:scale-110 active:scale-95 transition-all z-[70]"
-      >
-        {isGlobalChatOpen ? <X size={24} /> : (
-          <div className="relative">
-            <MessageCircle size={24} />
-            {hasUnread && (
-              <span className="absolute -top-1 -right-1 flex h-3 w-3">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500 border border-white" />
-              </span>
-            )}
-          </div>
-        )}
-      </button>
 
       {/* Modals */}
       {isEditModalOpen && (

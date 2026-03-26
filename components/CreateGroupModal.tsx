@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import axios from 'axios';
 import { X, Users, AlignLeft, ArrowRight } from 'lucide-react';
-import api from '../lib/api';
+import api from '../lib/axios';
 
 interface CreateGroupModalProps {
   isOpen: boolean;

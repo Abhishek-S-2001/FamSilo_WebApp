@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { Search, Bell, Settings, User, LogOut } from 'lucide-react';
 import Link from 'next/link';
 
+import NotificationBell from '@/components/NotificationBell';
+
 export default function TopNavbar() {
   const router = useRouter();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -59,14 +61,12 @@ export default function TopNavbar() {
           <button className="w-10 h-10 rounded-full flex items-center justify-center text-[#464555] hover:bg-[#f2f4f6] transition-colors">
             <Search size={20} />
           </button>
-          <button className="w-10 h-10 rounded-full flex items-center justify-center text-[#464555] hover:bg-[#f2f4f6] transition-colors relative">
-            <Bell size={20} />
-            <span className="absolute top-2 right-2.5 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
-          </button>
           <button className="w-10 h-10 rounded-full flex items-center justify-center text-[#464555] hover:bg-[#f2f4f6] transition-colors">
             <Settings size={20} />
           </button>
         </div>
+
+        <NotificationBell />
 
         {/* Profile Dropdown Container */}
         <div className="relative" ref={menuRef}>

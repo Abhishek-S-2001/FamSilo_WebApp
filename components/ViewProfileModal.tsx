@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { X, MapPin, Calendar } from 'lucide-react';
-import api from '@/lib/api';
+import api from '@/lib/axios';
 
 interface ViewProfileModalProps {
   userId: string | null;
