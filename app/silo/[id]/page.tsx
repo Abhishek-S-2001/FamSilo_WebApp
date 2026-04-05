@@ -9,7 +9,7 @@ import InviteMemberModal from '@/components/InviteMemberModal';
 import SiloHeader from '@/components/silo/SiloHeader';
 import SiloVaultTab from '@/components/silo/SiloVaultTab';
 import SiloMembersTab from '@/components/silo/SiloMembersTab';
-import SiloPlaceholderTab from '@/components/silo/SiloPlaceholderTab';
+import SiloFeed from '@/components/silo/SiloFeed';
 import { useSilo } from '@/lib/hooks/useSilo';
 
 export default function SiloDashboard() {
@@ -18,7 +18,7 @@ export default function SiloDashboard() {
 
   const { silo, members, isLoading } = useSilo(siloId);
 
-  const [activeTab, setActiveTab] = useState('Vault');
+  const [activeTab, setActiveTab] = useState('Feed');
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
 
   if (isLoading) {
@@ -50,7 +50,7 @@ export default function SiloDashboard() {
 
           {activeTab === 'Vault' && <SiloVaultTab />}
           {activeTab === 'Members' && <SiloMembersTab members={members} />}
-          {(activeTab === 'Feed' || activeTab === 'Calendar') && <SiloPlaceholderTab tab={activeTab} />}
+          {activeTab === 'Feed' && <SiloFeed siloId={siloId} />}
 
         </section>
 

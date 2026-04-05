@@ -8,12 +8,12 @@ import { Mail, Lock, User, ShieldCheck, ArrowRight, Eye, EyeOff } from 'lucide-r
 
 export default function AuthPage() {
   const router = useRouter();
-  
+
   // UI State
   const [isLogin, setIsLogin] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  
+
   // ADDED: State to toggle password visibility
   const [showPassword, setShowPassword] = useState(false);
 
@@ -22,7 +22,7 @@ export default function AuthPage() {
   const [password, setPassword] = useState('');
   const [username, setUsername] = useState('');
 
-const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setErrorMessage(''); // Clear old errors
@@ -45,41 +45,41 @@ const handleSubmit = async (e: React.FormEvent) => {
         response = await axios.post(`${apiUrl}/auth/login`, { identifier: email, password });
       } else {
         response = await axios.post(`${apiUrl}/auth/signup`, { email, password, username });
-        
+
         if (!response.data.access_token) {
           response = await axios.post(`${apiUrl}/auth/login`, { email, password });
         }
       }
 
       const { access_token } = response.data;
-      
+
       if (!access_token) {
         throw new Error("Failed to retrieve access token.");
       }
 
       localStorage.setItem('family_app_token', access_token);
-      
+
       const pendingInviteToken = sessionStorage.getItem('pending_invite_token');
-      
+
       if (pendingInviteToken) {
-        sessionStorage.removeItem('pending_invite_token'); 
+        sessionStorage.removeItem('pending_invite_token');
         window.location.href = `/join?token=${pendingInviteToken}`;
       } else {
         window.location.href = '/';
       }
-      
+
     } catch (error: any) {
       // 1. Next.js will still log this in the console, which is normal for dev!
-      console.log("This error",error);
-      console.error("Auth Request Failed:", error?.response?.status); 
-      
-      
+      console.log("This error", error);
+      console.error("Auth Request Failed:", error?.response?.status);
+
+
       // 2. Extract the exact error message your Python backend sent over
       const message = error.response?.data?.detail || 'Invalid email or password. Please try again.';
-      
+
       // 3. Set it to your React state so the user sees it!
       setErrorMessage(typeof message === 'string' ? message : JSON.stringify(message));
-      
+
     } finally {
       setIsLoading(false);
     }
@@ -92,7 +92,7 @@ const handleSubmit = async (e: React.FormEvent) => {
         <img src="https://lh3.googleusercontent.com/aida-public/AB6AXuC84zZnOJ92tw9elXuSSuUeCUOh9k7ipvR7GDivGyOWjvySf30SUmtxhVVBGtJGAF0rAi1yHYHRIZmvzAm_oVoLF9CnRHmryolhhZX6JVWSSQ2Z4fyKZjX4imUJ_7BgaID9PIVLKciz4RiqH9c7NIZ3_8CWL4W4yturzp--atC-R10YlHvxtGv447H6IibaP8d8R9onsDGyqwkZmfN5tL_isZf5pgP-_ZaSXPHGV5IgdVrIBkCxcgAUGyvzclDHFVwsTViS6sMCngVR" alt="preload" />
         <img src="https://lh3.googleusercontent.com/aida-public/AB6AXuB1WHsGuZO9B9TXGBq_s4OIgdBfTeJS_vHk8Fq9fjxW1YpX0VZE2k15FHaWzO-U7y7VB_OiPbRIa0YV7M0SZwnZaaaSEaaCsFsRiGPF1UYR9yxrd7fZcBZe6v_vtg-P61DPTBTrQ6wXRYCLh4L63GXPG_o-Ph0P1sqxR7DBLvT75MburHf1yJEjNrjgBtmiw6Dy_XQZWd9ShvvW58H__xCb57Rt-GYDB3jIood8IFK3Eq8WANzuqQ8qUPRNSi6eSp7iZa2bISUGXSf8" alt="preload" />
       </div>
-      
+
       {/* --- TOP NAVIGATION BAR --- */}
       <header className="w-full absolute top-0 left-14 z-50 flex items-center justify-between px-8 py-6 max-w-7xl mx-auto">
         <div className="text-2xl font-extrabold tracking-tight text-[#0434c6]" style={{ fontFamily: '"Plus Jakarta Sans", sans-serif' }}>
@@ -102,7 +102,7 @@ const handleSubmit = async (e: React.FormEvent) => {
           <span className="text-[#464555] font-medium text-sm tracking-wide" style={{ fontFamily: '"Manrope", sans-serif' }}>
             {isLogin ? "New to FamSilo?" : "Already a member?"}
           </span>
-          <button 
+          <button
             onClick={() => { setIsLogin(!isLogin); setErrorMessage(''); }}
             className="text-[#0434c6] font-bold hover:text-[#3050de] transition-colors"
           >
@@ -113,18 +113,18 @@ const handleSubmit = async (e: React.FormEvent) => {
 
       {/* --- MAIN CONTENT AREA --- */}
       <main className="flex-grow flex flex-col md:flex-row min-h-screen pt-6 z-10 max-w-7xl mx-auto w-full items-stretch">
-        
+
         {/* --- LEFT SECTION: VISUALS --- */}
         <section className="hidden md:flex md:w-1/2 relative p-6 lg:p-12">
           {isLogin ? (
             <div className="relative w-full h-full rounded-[3rem] overflow-hidden shadow-[0_30px_60px_rgba(25,28,30,0.1)] flex flex-col justify-end p-12">
-              <img 
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuC84zZnOJ92tw9elXuSSuUeCUOh9k7ipvR7GDivGyOWjvySf30SUmtxhVVBGtJGAF0rAi1yHYHRIZmvzAm_oVoLF9CnRHmryolhhZX6JVWSSQ2Z4fyKZjX4imUJ_7BgaID9PIVLKciz4RiqH9c7NIZ3_8CWL4W4yturzp--atC-R10YlHvxtGv447H6IibaP8d8R9onsDGyqwkZmfN5tL_isZf5pgP-_ZaSXPHGV5IgdVrIBkCxcgAUGyvzclDHFVwsTViS6sMCngVR" 
-                alt="Family Gathering" 
+              <img
+                src="https://lh3.googleusercontent.com/aida-public/AB6AXuC84zZnOJ92tw9elXuSSuUeCUOh9k7ipvR7GDivGyOWjvySf30SUmtxhVVBGtJGAF0rAi1yHYHRIZmvzAm_oVoLF9CnRHmryolhhZX6JVWSSQ2Z4fyKZjX4imUJ_7BgaID9PIVLKciz4RiqH9c7NIZ3_8CWL4W4yturzp--atC-R10YlHvxtGv447H6IibaP8d8R9onsDGyqwkZmfN5tL_isZf5pgP-_ZaSXPHGV5IgdVrIBkCxcgAUGyvzclDHFVwsTViS6sMCngVR"
+                alt="Family Gathering"
                 className="absolute inset-0 w-full h-full object-cover filter brightness-[0.85] scale-105"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-[#0434c6]/90 via-[#0434c6]/20 to-transparent"></div>
-              
+
               <div className="relative z-10 max-w-lg w-full">
                 <blockquote className="text-white">
                   <p className="text-4xl lg:text-5xl font-extrabold leading-tight mb-4 tracking-tight drop-shadow-md" style={{ fontFamily: '"Plus Jakarta Sans", sans-serif' }}>
@@ -138,18 +138,18 @@ const handleSubmit = async (e: React.FormEvent) => {
             </div>
           ) : (
             <div className="relative w-full h-full rounded-[3rem] overflow-hidden shadow-[0_30px_60px_rgba(25,28,30,0.1)] flex flex-col justify-center p-12">
-              <img 
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuB1WHsGuZO9B9TXGBq_s4OIgdBfTeJS_vHk8Fq9fjxW1YpX0VZE2k15FHaWzO-U7y7VB_OiPbRIa0YV7M0SZwnZaaaSEaaCsFsRiGPF1UYR9yxrd7fZcBZe6v_vtg-P61DPTBTrQ6wXRYCLh4L63GXPG_o-Ph0P1sqxR7DBLvT75MburHf1yJEjNrjgBtmiw6Dy_XQZWd9ShvvW58H__xCb57Rt-GYDB3jIood8IFK3Eq8WANzuqQ8qUPRNSi6eSp7iZa2bISUGXSf8" 
-                alt="Multi-generational family" 
+              <img
+                src="https://lh3.googleusercontent.com/aida-public/AB6AXuB1WHsGuZO9B9TXGBq_s4OIgdBfTeJS_vHk8Fq9fjxW1YpX0VZE2k15FHaWzO-U7y7VB_OiPbRIa0YV7M0SZwnZaaaSEaaCsFsRiGPF1UYR9yxrd7fZcBZe6v_vtg-P61DPTBTrQ6wXRYCLh4L63GXPG_o-Ph0P1sqxR7DBLvT75MburHf1yJEjNrjgBtmiw6Dy_XQZWd9ShvvW58H__xCb57Rt-GYDB3jIood8IFK3Eq8WANzuqQ8qUPRNSi6eSp7iZa2bISUGXSf8"
+                alt="Multi-generational family"
                 className="absolute inset-0 w-full h-full object-cover opacity-90 scale-105"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-[#0434c6]/60 via-[#0434c6]/20 to-transparent mix-blend-multiply"></div>
-              
+
               <div className="relative z-10 max-w-lg w-full mt-auto">
                 <h1 className="text-4xl lg:text-5xl font-extrabold text-white leading-tight tracking-tight mb-6 drop-shadow-md" style={{ fontFamily: '"Plus Jakarta Sans", sans-serif' }}>
-                  Preserve your <br/><span className="text-[#c3e9f1]">family legacy</span> for generations.
+                  Preserve your <br /><span className="text-[#c3e9f1]">family legacy</span> for generations.
                 </h1>
-                
+
                 <div className="mt-8 p-6 bg-white/20 backdrop-blur-[20px] rounded-2xl shadow-[0_20px_40px_rgba(25,28,30,0.06)] border border-white/30">
                   <div className="flex items-center gap-4 mb-3">
                     <div className="w-10 h-10 rounded-full bg-[#0434c6] flex items-center justify-center text-white shadow-md">
@@ -168,9 +168,9 @@ const handleSubmit = async (e: React.FormEvent) => {
 
         {/* --- RIGHT SECTION: THE FORM --- */}
         <section className="w-full md:w-1/2 flex items-center justify-center p-6 lg:p-12">
-          
+
           <div className="w-full max-w-md bg-white/60 backdrop-blur-2xl p-10 lg:p-12 rounded-[3rem] shadow-[0_30px_60px_rgba(25,28,30,0.06)] border border-white/60">
-            
+
             <div className="space-y-2 mb-8">
               <h2 className="text-3xl font-extrabold text-[#191c1e] tracking-tight" style={{ fontFamily: '"Plus Jakarta Sans", sans-serif' }}>
                 {isLogin ? 'Welcome to your inner circle' : 'Create your account'}
@@ -181,7 +181,7 @@ const handleSubmit = async (e: React.FormEvent) => {
             </div>
 
             <form className="space-y-5" onSubmit={handleSubmit}>
-              
+
               {/* Username Input (Signup Only) */}
               {!isLogin && (
                 <div className="space-y-1.5">
@@ -236,7 +236,7 @@ const handleSubmit = async (e: React.FormEvent) => {
                     placeholder="••••••••"
                   />
                   <Lock size={18} className="absolute left-4 top-4 text-[#777587]" />
-                  
+
                   {/* ADDED: Eye toggle button */}
                   <button
                     type="button"

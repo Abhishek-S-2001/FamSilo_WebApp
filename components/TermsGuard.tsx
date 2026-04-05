@@ -6,23 +6,46 @@ import { useProfile } from '@/lib/hooks/useProfile';
 import api from '@/lib/axios';
 import { ShieldCheck, Loader2 } from 'lucide-react';
 
+// Public routes where the guard should NEVER activate or fetch profile
+const PUBLIC_ROUTES = ['/login', '/join', '/docs'];
+
+/**
+ * Outer shell — runs BEFORE any hooks.
+ * Checks pathname and token synchronously to avoid triggering
+ * useProfile's SWR fetch on unauthenticated pages (which would
+ * cause a 401 → redirect → infinite loop).
+ */
 export default function TermsGuard({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { profile, isLoading, mutate } = useProfile();
-  const [isAccepting, setIsAccepting] = useState(false);
 
-  // Do not block public or unauthenticated routes
-  if (pathname === '/login' || pathname === '/join' || pathname === '/docs') {
+  // 1. Skip entirely on public routes — no hooks, no fetch
+  if (PUBLIC_ROUTES.includes(pathname || '')) {
     return <>{children}</>;
   }
 
-  // If still fetching the profile, we can just show the children for a split second 
-  // or a loading state. Showing children is smoother for the UI until profile returns.
+  // 2. Skip if there's no token (user not logged in yet)
+  if (typeof window !== 'undefined' && !localStorage.getItem('family_app_token')) {
+    return <>{children}</>;
+  }
+
+  // 3. Safe to use hooks now — render the inner guard
+  return <TermsGuardInner>{children}</TermsGuardInner>;
+}
+
+/**
+ * Inner component — only mounts when we KNOW the user is on a
+ * protected route AND has a token, so the SWR fetch is safe.
+ */
+function TermsGuardInner({ children }: { children: React.ReactNode }) {
+  const { profile, isLoading, mutate } = useProfile();
+  const [isAccepting, setIsAccepting] = useState(false);
+
+  // Still loading profile — show children normally while we wait
   if (isLoading || !profile) {
     return <>{children}</>;
   }
 
-  // If terms are already accepted, render children normally
+  // Terms already accepted — nothing to do
   if (profile.terms_accepted) {
     return <>{children}</>;
   }
@@ -31,8 +54,7 @@ export default function TermsGuard({ children }: { children: React.ReactNode }) 
     setIsAccepting(true);
     try {
       await api.post('/users/me/accept-terms');
-      // Immediately tell SWR that terms are accepted so it removes the modal
-      mutate();
+      mutate(); // Re-fetch profile so terms_accepted flips to true
     } catch (error) {
       console.error('Failed to accept terms', error);
       setIsAccepting(false);
