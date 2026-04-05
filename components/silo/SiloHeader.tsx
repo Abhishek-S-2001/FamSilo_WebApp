@@ -11,7 +11,7 @@ interface SiloHeaderProps {
   onInviteClick: () => void;
 }
 
-const TABS = ['Feed', 'Vault', 'Calendar', 'Members'];
+const TABS = ['Feed', 'Vault', 'Members'];
 
 export default function SiloHeader({ silo, members, activeTab, onTabChange, onInviteClick }: SiloHeaderProps) {
   return (
