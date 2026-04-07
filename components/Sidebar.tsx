@@ -1,7 +1,7 @@
 'use client';
 
-import { Home, Lock, Users, Plus, HelpCircle, Shield, Loader2, LogOut } from 'lucide-react';
-import { useState } from 'react';
+import { Home, Lock, Users, Plus, HelpCircle, Shield, Loader2, LogOut, X } from 'lucide-react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import useSWR from 'swr';
@@ -16,8 +16,20 @@ const inactiveStyle = 'text-[#464555] hover:bg-white/60';
 
 export default function Sidebar() {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
+
+  useEffect(() => {
+    const handleToggle = () => setIsMobileOpen(prev => !prev);
+    window.addEventListener('toggle-mobile-sidebar', handleToggle);
+    return () => window.removeEventListener('toggle-mobile-sidebar', handleToggle);
+  }, []);
+
+  // Close sidebar on route change on mobile
+  useEffect(() => {
+    setIsMobileOpen(false);
+  }, [pathname]);
 
   const { data: silos = [], isLoading, mutate } = useSWR('/silos', fetcher, {
     revalidateOnFocus: false,
@@ -32,14 +44,39 @@ export default function Sidebar() {
 
   return (
     <>
+      {/* Mobile Backdrop */}
+      {isMobileOpen && (
+        <div 
+          className="fixed inset-0 bg-black/20 z-40 md:hidden backdrop-blur-sm"
+          onClick={() => setIsMobileOpen(false)}
+        />
+      )}
+
       {/* 
-        Key layout fix: 
-        - `fixed` positions it relative to viewport, not page content
-        - `top-28` clears the TopNavbar
-        - `bottom-0` stretches to screen bottom
-        - footer always visible at bottom regardless of silo count
+        Sidebar Content
+        - `fixed` on mobile, but behaves like sticky/fixed on desktop
+        - transitions sliding in/out on mobile
       */}
-      <aside className="hidden md:flex flex-col fixed top-28 bottom-0 w-[inherit] max-w-[220px] pb-8 pr-4 no-scrollbar">
+      <aside className={`
+        fixed md:flex flex-col
+        top-0 md:top-28 bottom-0 left-0 md:left-auto
+        w-[280px] md:w-[inherit] md:max-w-[220px]
+        bg-white md:bg-transparent
+        shadow-[20px_0_40px_rgba(4,52,198,0.1)] md:shadow-none
+        pb-8 pt-6 md:pt-0 pl-6 md:pl-0 pr-6 md:pr-4
+        z-50 md:z-0
+        transition-transform duration-300 ease-in-out
+        no-scrollbar
+        ${isMobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+      `}>
+
+        {/* Mobile Header in Sidebar */}
+        <div className="flex md:hidden items-center justify-between mb-6 border-b border-[#f2f4f6] pb-4">
+          <span className="text-xl font-extrabold text-[#0434c6]" style={{ fontFamily: '"Plus Jakarta Sans", sans-serif' }}>FamSilo</span>
+          <button onClick={() => setIsMobileOpen(false)} className="text-[#464555] p-2 hover:bg-[#f2f4f6] rounded-full transition-colors">
+            <X size={20} />
+          </button>
+        </div>
 
         {/* Scrollable content area — grows and scrolls independently */}
         <div className="flex flex-col gap-8 overflow-y-auto flex-1 no-scrollbar">

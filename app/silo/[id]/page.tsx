@@ -32,13 +32,13 @@ export default function SiloDashboard() {
   return (
     <div className="bg-gradient-to-br from-[#f0f4ff] to-[#f7f9fb] h-screen overflow-hidden font-sans text-[#191c1e]">
       <TopNavbar />
-      <main className="pt-28 px-8 pb-0 max-w-[1920px] mx-auto grid grid-cols-1 md:grid-cols-12 gap-8 h-full relative">
+      <main className="pt-20 md:pt-24 px-4 md:px-8 pb-0 max-w-[1920px] mx-auto grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-8 h-full relative">
 
-        <div className="col-span-1 md:col-span-3 lg:col-span-2 h-full">
+        <div className="md:col-span-3 lg:col-span-2 h-0 md:h-full z-50 md:z-auto">
           <Sidebar />
         </div>
 
-        <section className="col-span-1 md:col-span-9 lg:col-span-10 flex flex-col gap-6 overflow-y-auto h-full pb-32 no-scrollbar transition-all duration-500 ease-in-out">
+        <section className="md:col-span-9 lg:col-span-10 flex flex-col gap-6 overflow-y-auto h-full pb-32 no-scrollbar transition-all duration-500 ease-in-out">
 
           <SiloHeader
             silo={silo}
