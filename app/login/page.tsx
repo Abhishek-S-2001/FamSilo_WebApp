@@ -3,16 +3,19 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
+import { supabase } from '@/lib/supabase';
 // ADDED: Eye and EyeOff icons
-import { Mail, Lock, User, ShieldCheck, ArrowRight, Eye, EyeOff } from 'lucide-react';
+import { Mail, Lock, User, ShieldCheck, ArrowRight, Eye, EyeOff, ArrowLeft } from 'lucide-react';
 
 export default function AuthPage() {
   const router = useRouter();
 
   // UI State
   const [isLogin, setIsLogin] = useState(true);
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
 
   // ADDED: State to toggle password visibility
   const [showPassword, setShowPassword] = useState(false);
@@ -22,10 +25,48 @@ export default function AuthPage() {
   const [password, setPassword] = useState('');
   const [username, setUsername] = useState('');
 
+  const handleGoogleAuth = async () => {
+    try {
+      setErrorMessage('');
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+          queryParams: {
+            prompt: 'select_account',
+          },
+        },
+      });
+      if (error) throw error;
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Failed to initialize Google Auth');
+    }
+  };
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setErrorMessage('');
+    setSuccessMessage('');
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      if (error) throw error;
+      setSuccessMessage('Password reset link sent! Check your email.');
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Failed to send reset link');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setErrorMessage(''); // Clear old errors
+    setSuccessMessage('');
 
     if (!isLogin) {
       // Regex: 3-20 characters, only letters, numbers, and underscores
@@ -94,16 +135,16 @@ export default function AuthPage() {
       </div>
 
       {/* --- TOP NAVIGATION BAR --- */}
-      <header className="w-full absolute top-0 left-14 z-50 flex items-center justify-between px-8 py-6 max-w-7xl mx-auto">
+      <header className="w-full absolute top-0 left-0 z-50 flex items-center justify-between px-6 py-4 md:px-8 md:py-6 max-w-7xl mx-auto">
         <div className="text-2xl font-extrabold tracking-tight text-[#0434c6]" style={{ fontFamily: '"Plus Jakarta Sans", sans-serif' }}>
           FamSilo
         </div>
-        <div className="hidden md:flex items-center gap-6">
-          <span className="text-[#464555] font-medium text-sm tracking-wide" style={{ fontFamily: '"Manrope", sans-serif' }}>
+        <div className="flex items-center gap-3 md:gap-6">
+          <span className="hidden md:inline text-[#464555] font-medium text-sm tracking-wide" style={{ fontFamily: '"Manrope", sans-serif' }}>
             {isLogin ? "New to FamSilo?" : "Already a member?"}
           </span>
           <button
-            onClick={() => { setIsLogin(!isLogin); setErrorMessage(''); }}
+            onClick={() => { setIsLogin(!isLogin); setIsForgotPassword(false); setErrorMessage(''); }}
             className="text-[#0434c6] font-bold hover:text-[#3050de] transition-colors"
           >
             {isLogin ? "Sign up" : "Log in"}
@@ -112,7 +153,7 @@ export default function AuthPage() {
       </header>
 
       {/* --- MAIN CONTENT AREA --- */}
-      <main className="flex-grow flex flex-col md:flex-row min-h-screen pt-6 z-10 max-w-7xl mx-auto w-full items-stretch">
+      <main className="flex-grow flex flex-col md:flex-row min-h-screen pt-16 md:pt-0 z-10 max-w-7xl mx-auto w-full items-stretch">
 
         {/* --- LEFT SECTION: VISUALS --- */}
         <section className="hidden md:flex md:w-1/2 relative p-6 lg:p-12">
@@ -167,19 +208,67 @@ export default function AuthPage() {
         </section>
 
         {/* --- RIGHT SECTION: THE FORM --- */}
-        <section className="w-full md:w-1/2 flex items-center justify-center p-6 lg:p-12">
+        <section className="w-full md:w-1/2 flex items-center justify-center p-4 sm:p-6 lg:p-12 self-center">
 
-          <div className="w-full max-w-md bg-white/60 backdrop-blur-2xl p-10 lg:p-12 rounded-[3rem] shadow-[0_30px_60px_rgba(25,28,30,0.06)] border border-white/60">
+          <div className="w-full max-w-md bg-white/60 backdrop-blur-2xl p-6 sm:p-10 lg:p-12 rounded-[2.5rem] sm:rounded-[3rem] shadow-[0_30px_60px_rgba(25,28,30,0.06)] border border-white/60">
 
             <div className="space-y-2 mb-8">
               <h2 className="text-3xl font-extrabold text-[#191c1e] tracking-tight" style={{ fontFamily: '"Plus Jakarta Sans", sans-serif' }}>
-                {isLogin ? 'Welcome to your inner circle' : 'Create your account'}
+                {isForgotPassword ? 'Reset Password' : (isLogin ? 'Welcome to your inner circle' : 'Create your account')}
               </h2>
               <p className="text-[#464555] font-medium text-sm" style={{ fontFamily: '"Plus Jakarta Sans", sans-serif' }}>
-                {isLogin ? "Preserve your family's legacy in a safe space." : "Join FamSilo and start capturing the moments that matter."}
+                {isForgotPassword ? "Enter your email to receive a recovery link." : (isLogin ? "Preserve your family's legacy in a safe space." : "Join FamSilo and start capturing the moments that matter.")}
               </p>
             </div>
 
+            {isForgotPassword ? (
+              <form className="space-y-5" onSubmit={handleResetPassword}>
+                <div className="space-y-1.5">
+                  <label className="block text-sm font-bold text-[#464555] ml-1" style={{ fontFamily: '"Manrope", sans-serif' }}>
+                    Email Address
+                  </label>
+                  <div className="relative group">
+                    <input
+                      type="email"
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="w-full px-5 py-3.5 pl-12 bg-white/50 border-none rounded-xl focus:ring-2 focus:ring-[#0434c6]/50 focus:bg-white transition-all text-[#191c1e] outline-none font-medium placeholder-[#777587]"
+                      placeholder="name@family.com"
+                    />
+                    <Mail size={18} className="absolute left-4 top-4 text-[#777587]" />
+                  </div>
+                </div>
+
+                {errorMessage && (
+                  <div className="text-[#93000a] text-sm text-center bg-[#ffdad6] p-3 rounded-xl font-bold border-none">
+                    {errorMessage}
+                  </div>
+                )}
+                
+                {successMessage && (
+                  <div className="text-[#0e5c2e] text-sm text-center bg-[#c4eed0] p-3 rounded-xl font-bold border-none">
+                    {successMessage}
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={isLoading || !!successMessage}
+                  className="w-full py-3.5 mt-2 bg-gradient-to-br from-[#0434c6] to-[#3050de] text-white font-extrabold rounded-full shadow-[0_10px_25px_rgba(4,52,198,0.25)] hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50 border-none"
+                  style={{ fontFamily: '"Plus Jakarta Sans", sans-serif' }}
+                >
+                  {isLoading ? 'Sending...' : 'Send Reset Link'}
+                  {!isLoading && <ArrowRight size={18} />}
+                </button>
+
+                <div className="text-center mt-4">
+                  <button type="button" onClick={() => { setIsForgotPassword(false); setErrorMessage(''); setSuccessMessage(''); }} className="text-sm font-bold text-[#464555] hover:text-[#0434c6] flex items-center justify-center gap-2 mx-auto transition-colors">
+                    <ArrowLeft size={16} /> Back to Login
+                  </button>
+                </div>
+              </form>
+            ) : (
             <form className="space-y-5" onSubmit={handleSubmit}>
 
               {/* Username Input (Signup Only) */}
@@ -222,7 +311,7 @@ export default function AuthPage() {
               <div className="space-y-1.5">
                 <div className="flex justify-between items-center ml-1">
                   <label className="text-sm font-bold text-[#464555]" style={{ fontFamily: '"Manrope", sans-serif' }}>Password</label>
-                  {isLogin && <a href="#" className="text-xs font-bold text-[#0434c6] hover:text-[#3050de] transition-colors" style={{ fontFamily: '"Manrope", sans-serif' }}>Forgot password?</a>}
+                  {isLogin && <button type="button" onClick={() => { setIsForgotPassword(true); setErrorMessage(''); setSuccessMessage(''); }} className="text-xs font-bold text-[#0434c6] hover:text-[#3050de] transition-colors" style={{ fontFamily: '"Manrope", sans-serif' }}>Forgot password?</button>}
                 </div>
                 <div className="relative group">
                   <input
@@ -266,7 +355,8 @@ export default function AuthPage() {
                 {isLoading ? 'Processing...' : (isLogin ? 'Sign In' : 'Create Account')}
                 {!isLogin && !isLoading && <ArrowRight size={18} />}
               </button>
-            </form>
+              </form>
+            )}
 
             {/* Divider */}
             <div className="relative flex items-center py-4 mt-4">
@@ -276,7 +366,7 @@ export default function AuthPage() {
             </div>
 
             {/* Google Button - Glassmorphic */}
-            <button className="w-full flex items-center justify-center gap-3 py-3.5 bg-white/40 backdrop-blur-sm border border-white/60 rounded-full hover:bg-white/70 transition-colors text-sm font-bold text-[#191c1e] shadow-sm" style={{ fontFamily: '"Plus Jakarta Sans", sans-serif' }}>
+            <button type="button" onClick={handleGoogleAuth} className="w-full flex items-center justify-center gap-3 py-3.5 bg-white/40 backdrop-blur-sm border border-white/60 rounded-full hover:bg-white/70 transition-colors text-sm font-bold text-[#191c1e] shadow-sm" style={{ fontFamily: '"Plus Jakarta Sans", sans-serif' }}>
               <svg className="w-5 h-5" viewBox="0 0 24 24">
                 <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
                 <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />

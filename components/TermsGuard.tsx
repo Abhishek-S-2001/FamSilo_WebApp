@@ -7,7 +7,7 @@ import api from '@/lib/axios';
 import { ShieldCheck, Loader2 } from 'lucide-react';
 
 // Public routes where the guard should NEVER activate or fetch profile
-const PUBLIC_ROUTES = ['/login', '/join', '/docs'];
+const PUBLIC_ROUTES = ['/login', '/join', '/docs', '/auth/callback', '/reset-password'];
 
 /**
  * Outer shell — runs BEFORE any hooks.

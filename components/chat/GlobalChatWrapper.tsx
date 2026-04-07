@@ -10,8 +10,8 @@ export default function GlobalChatWrapper() {
   const { isChatOpen, setIsChatOpen, activeChatId, activeChatName, openChatWith } = useChat();
   const pathname = usePathname();
 
-  // Hide the global chat button on login and docs pages
-  if (pathname === '/login' || pathname === '/docs') {
+  // Hide the global chat button on login, callback, reset-password, and docs pages
+  if (pathname === '/login' || pathname === '/docs' || pathname === '/auth/callback' || pathname === '/reset-password' || pathname?.startsWith('/auth/')) {
     return null;
   }
 

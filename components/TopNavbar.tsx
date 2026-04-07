@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, Bell, Settings, User, LogOut } from 'lucide-react';
+import { Search, Bell, Settings, User, LogOut, Menu } from 'lucide-react';
 import Link from 'next/link';
 
 import NotificationBell from '@/components/NotificationBell';
@@ -38,10 +38,17 @@ export default function TopNavbar() {
   };
 
   return (
-    <nav className="fixed top-0 left-0 w-full h-20 bg-white/80 backdrop-blur-2xl z-40 border-b border-[#f2f4f6]/80 flex items-center justify-between px-8 transition-all">
+    <nav className="fixed top-0 left-0 w-full h-20 bg-white/80 backdrop-blur-2xl z-40 border-b border-[#f2f4f6]/80 flex items-center justify-between px-4 md:px-8 transition-all">
       
       {/* LEFT: Logo & Main Links */}
-      <div className="flex items-center gap-12">
+      <div className="flex items-center gap-4 md:gap-12">
+        {/* Mobile Menu Toggle */}
+        <button 
+          onClick={() => window.dispatchEvent(new Event('toggle-mobile-sidebar'))}
+          className="md:hidden flex items-center justify-center p-2 -ml-2 text-[#464555] hover:bg-[#f2f4f6] rounded-full transition-colors"
+        >
+          <Menu size={24} />
+        </button>
         <Link href="/" className="text-2xl font-extrabold tracking-tight text-[#0434c6]" style={{ fontFamily: '"Plus Jakarta Sans", sans-serif' }}>
           FamSilo
         </Link>

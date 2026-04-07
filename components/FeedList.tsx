@@ -71,8 +71,12 @@ export default function FeedList() {
       });
 
       setPosts(mapped);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to fetch global feed:', err);
+      // Alert the user with the EXACT backend error message
+      if (err.response?.data?.detail) {
+        alert("BACKEND FEED ERROR:\n" + err.response.data.detail);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -83,22 +87,21 @@ export default function FeedList() {
   }, [fetchFeed]);
 
   // Filter logic
-  const displayedPosts = activeFilterId === 'all' 
-    ? posts 
+  const displayedPosts = activeFilterId === 'all'
+    ? posts
     : posts.filter((p: any) => p.siloId === activeFilterId);
 
   return (
-    <div className="flex flex-col gap-6 max-w-2xl mx-auto w-full">
+    <div className="flex flex-col gap-4 max-w-2xl mx-auto w-full pt-4 md:pt-6">
       {/* ── Filters ── */}
       {silos.length > 0 && (
         <div className="flex items-center gap-2 overflow-x-auto pb-2 no-scrollbar px-1">
           <button
             onClick={() => setActiveFilterId('all')}
-            className={`flex-shrink-0 px-4 py-2 rounded-full text-xs font-bold transition-all ${
-              activeFilterId === 'all'
-                ? 'bg-[#191c1e] text-white shadow-md'
-                : 'bg-white border border-[#f2f4f6] text-[#777587] hover:border-[#c7c4d8]'
-            }`}
+            className={`flex-shrink-0 px-5 py-2.5 rounded-full text-sm font-bold transition-all shadow-sm ${activeFilterId === 'all'
+                ? 'bg-[#191c1e] text-white shadow-md scale-105'
+                : 'bg-white border border-[#f2f4f6] text-[#777587] hover:border-[#c7c4d8] hover:text-[#191c1e]'
+              }`}
             style={{ fontFamily: '"Plus Jakarta Sans", sans-serif' }}
           >
             All Updates
@@ -107,11 +110,10 @@ export default function FeedList() {
             <button
               key={silo.id}
               onClick={() => setActiveFilterId(silo.id)}
-              className={`flex-shrink-0 px-4 py-2 rounded-full text-xs font-bold transition-all ${
-                activeFilterId === silo.id
-                  ? 'bg-[#191c1e] text-white shadow-md'
-                  : 'bg-white border border-[#f2f4f6] text-[#777587] hover:border-[#c7c4d8]'
-              }`}
+              className={`flex-shrink-0 px-5 py-2.5 rounded-full text-sm font-bold transition-all shadow-sm ${activeFilterId === silo.id
+                  ? 'bg-[#191c1e] text-white shadow-md scale-105'
+                  : 'bg-white border border-[#f2f4f6] text-[#777587] hover:border-[#c7c4d8] hover:text-[#191c1e]'
+                }`}
               style={{ fontFamily: '"Plus Jakarta Sans", sans-serif' }}
             >
               {silo.name}
@@ -145,11 +147,11 @@ export default function FeedList() {
       {/* ── Feed ── */}
       <div className="flex flex-col gap-8 pb-32">
         {!isLoading && displayedPosts.map(post => (
-          <FeedCard 
-            key={post.id} 
-            post={post} 
-            showOriginSilo={true} 
-            onDelete={(id) => setPosts(prev => prev.filter(p => p.id !== id))} 
+          <FeedCard
+            key={post.id}
+            post={post}
+            showOriginSilo={true}
+            onDelete={(id) => setPosts(prev => prev.filter(p => p.id !== id))}
           />
         ))}
       </div>
