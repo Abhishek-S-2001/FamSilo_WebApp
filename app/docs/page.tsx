@@ -15,6 +15,7 @@ const NAV_SECTIONS = [
   { id: 'database',      label: '🗄️ Database' },
   { id: 'lib',           label: '📦 Shared Lib' },
   { id: 'flows',         label: '🔁 Feature Flows' },
+  { id: 'moderation',    label: '🛡️ AI Moderation' },
   { id: 'issues',        label: '⚡ Known Issues' },
   { id: 'index',         label: '📂 File Index' },
 ];
@@ -628,6 +629,44 @@ export default function DocsPage() {
                 <FlowStep step={4} color="green"  title="Backend persists + broadcasts" description="INSERT into messages, then broadcasts payload to ALL connections in that room_id." />
                 <FlowConnector />
                 <FlowStep step={5} color="green"  title="All clients receive message" description="Each ChatWindow receives broadcast and appends to local message list without re-fetch." />
+              </div>
+            </Card>
+          </section>
+
+          {/* ═══════ 8.5. AI MODERATION ═══════ */}
+          <section>
+            <SectionTitle id="moderation" emoji="🛡️" title="AI Moderation Pipeline" />
+
+            <Card>
+              <div className="text-sm text-[#464555] leading-relaxed mb-6">
+                Every piece of user-generated content passes through a <strong>Zero-Trust AI Moderation Pipeline</strong> powered by Google Gemini before becoming public. This prevents PII leaks, harassment, and NSFW content.
+              </div>
+
+              <SubTitle>Moderation Workflows</SubTitle>
+              <Table
+                headers={['Content Type', 'Timing', 'Model', 'Action if Flagged']}
+                rows={[
+                  ['Text Posts & Captions', 'Synchronous',  <Code>gemini-2.5-flash</Code>, '422 Unprocessable Entity thrown instantly. Database write blocked.'],
+                  ['Comments',              'Synchronous',  <Code>gemini-2.5-flash</Code>, '422 Unprocessable Entity thrown instantly. Database write blocked.'],
+                  ['Images (JPEG/PNG)',     'Asynchronous', <Code>gemini-2.5-flash</Code>, 'DB status changed to quarantined. File moved to media-quarantine bucket.'],
+                  ['Videos (MP4/WebM)',     'Asynchronous', <Code>gemini-2.5-flash</Code>, 'DB status changed to quarantined. File moved to media-quarantine bucket.'],
+                ]}
+              />
+
+              <SubTitle>Frontend States</SubTitle>
+              <div className="space-y-4">
+                <div className="flex items-start gap-3">
+                  <Badge color="green">approved</Badge>
+                  <span className="text-sm text-[#464555]">Normal state. Visible in all feeds to all silo members.</span>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Badge color="orange">pending</Badge>
+                  <span className="text-sm text-[#464555]">Currently being analyzed by BackgroundTasks. Visible <strong>only to the author</strong> with a yellow loading banner.</span>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Badge color="red">quarantined</Badge>
+                  <span className="text-sm text-[#464555]">Flagged by AI. Excluded from all feeds. Visible <strong>only to the author</strong> (and admins) with a red shield warning. File moved to private storage.</span>
+                </div>
               </div>
             </Card>
           </section>

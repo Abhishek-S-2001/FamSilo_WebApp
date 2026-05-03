@@ -71,16 +71,18 @@ export default function AuthCallbackPage() {
       .eq('id', session.user.id);
 
     if (!profiles || profiles.length === 0) {
+      const metadata = session.user.user_metadata;
       const name =
-        session.user.user_metadata?.full_name
-          ?.replace(/\s/g, '')
-          .toLowerCase() ||
+        metadata?.full_name?.replace(/\s/g, '').toLowerCase() ||
         session.user.email?.split('@')[0] ||
         'user';
+      
       await supabase.from('profiles').insert({
         id: session.user.id,
         username: name + Math.floor(1000 + Math.random() * 9000),
         email: session.user.email,
+        full_name: metadata?.full_name || name,
+        avatar_url: metadata?.avatar_url || metadata?.picture || null,
         terms_accepted: false,
       });
     }

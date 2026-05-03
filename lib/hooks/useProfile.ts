@@ -12,6 +12,9 @@ export function useProfile() {
   return {
     profile: data?.profile ?? null,
     stats: data?.stats ?? { silos_joined: 0, known_members: 0, media_posts: 0 },
+    recent_memories: data?.recent_memories ?? [],
+    debug_all_posts: data?.debug_all_posts,
+    debug_current_user_id: data?.debug_current_user_id,
     silosList: data?.silos_list ?? [],
     membersList: data?.members_list ?? [],
     isLoading,

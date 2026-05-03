@@ -1,12 +1,13 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { X, ImagePlus, Type, UploadCloud, Loader2, Megaphone, Globe, Lock } from 'lucide-react';
+import { X, ImagePlus, Type, UploadCloud, Loader2, Megaphone, Globe, Lock, Video, AlertCircle, CheckCircle2 } from 'lucide-react';
 
 export interface NewPostPayload {
-  type: 'photo' | 'text' | 'proposal';
+  type: 'photo' | 'text' | 'proposal' | 'video';
   caption: string;
   imageFile?: File;
+  videoFile?: File;
   gradient?: string;
   isPublic: boolean;
 }
@@ -14,7 +15,7 @@ export interface NewPostPayload {
 interface CreatePostModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit?: (post: NewPostPayload) => void;
+  onSubmit?: (post: NewPostPayload) => Promise<void>;
 }
 
 const GRADIENT_SWATCHES = [
@@ -33,7 +34,13 @@ const SWATCH_PREVIEW_COLORS = [
   'from-amber-400 to-red-500',
 ];
 
-type PostMode = 'photo' | 'text' | 'proposal';
+// File size limits
+const IMAGE_MAX_BYTES = 10 * 1024 * 1024;  // 10 MB
+const VIDEO_MAX_BYTES = 100 * 1024 * 1024; // 100 MB
+
+type PostMode = 'photo' | 'text' | 'proposal' | 'video';
+
+type UploadStage = 'idle' | 'uploading' | 'saving' | 'done';
 
 export default function CreatePostModal({ isOpen, onClose, onSubmit }: CreatePostModalProps) {
   const [mode, setMode] = useState<PostMode>('photo');
@@ -44,77 +51,144 @@ export default function CreatePostModal({ isOpen, onClose, onSubmit }: CreatePos
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [isPublic, setIsPublic] = useState(true);
-  const [isPosting, setIsPosting] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [fileError, setFileError] = useState<string | null>(null);
+
+  // Upload progress states
+  const [uploadStage, setUploadStage] = useState<UploadStage>('idle');
+  const [uploadProgress, setUploadProgress] = useState(0); // 0–100
+
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
 
   if (!isOpen) return null;
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setSelectedFile(file);
-      setPreview(URL.createObjectURL(file));
+  const isPosting = uploadStage !== 'idle';
+
+  // ─── Validate & Set File ───
+  const applyFile = (file: File, type: 'image' | 'video') => {
+    setFileError(null);
+    const limit = type === 'image' ? IMAGE_MAX_BYTES : VIDEO_MAX_BYTES;
+    const limitLabel = type === 'image' ? '10 MB' : '100 MB';
+
+    if (file.size > limit) {
+      setFileError(`File too large. Maximum size for ${type}s is ${limitLabel}.`);
+      return;
     }
+
+    setSelectedFile(file);
+    setPreview(URL.createObjectURL(file));
+  };
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) applyFile(file, 'image');
+  };
+
+  const handleVideoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) applyFile(file, 'video');
   };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     const file = e.dataTransfer.files?.[0];
-    if (file && file.type.startsWith('image/')) {
-      setSelectedFile(file);
-      setPreview(URL.createObjectURL(file));
+    if (!file) return;
+    if (mode === 'photo' && file.type.startsWith('image/')) {
+      applyFile(file, 'image');
+    } else if (mode === 'video' && file.type.startsWith('video/')) {
+      applyFile(file, 'video');
+    } else {
+      setFileError(`Please drop a ${mode === 'photo' ? 'image' : 'video'} file.`);
     }
   };
 
+  const clearFile = () => {
+    setSelectedFile(null);
+    setPreview(null);
+    setFileError(null);
+  };
+
+  // ─── Validation ───
   const canPost = () => {
+    if (fileError) return false;
     if (mode === 'photo') return !!selectedFile;
+    if (mode === 'video') return !!selectedFile;
     if (mode === 'text') return !!textContent.trim();
     if (mode === 'proposal') return !!proposalText.trim();
     return false;
   };
 
+  // ─── Submit ───
   const handlePost = async () => {
-    setIsPosting(true);
+    if (!onSubmit) return;
+    setUploadStage('uploading');
+    setUploadProgress(0);
+
+    // Simulate progress during the upload phase
+    const progressInterval = setInterval(() => {
+      setUploadProgress((p) => {
+        if (p >= 85) { clearInterval(progressInterval); return p; }
+        return p + (mode === 'video' ? 3 : 8);
+      });
+    }, 250);
+
     const payload: NewPostPayload = {
       type: mode,
       caption:
         mode === 'photo' ? caption :
+        mode === 'video' ? caption :
         mode === 'text' ? textContent :
         proposalText,
       imageFile: mode === 'photo' ? selectedFile || undefined : undefined,
+      videoFile: mode === 'video' ? selectedFile || undefined : undefined,
       gradient: mode === 'text' ? GRADIENT_SWATCHES[selectedGradient] : undefined,
       isPublic,
     };
-    onSubmit?.(payload);
-    // The parent (SiloFeed) handles the async — we just reset
-    setTimeout(() => {
-      setIsPosting(false);
-      resetAndClose();
-    }, 600);
+
+    try {
+      await onSubmit(payload);
+      clearInterval(progressInterval);
+      setUploadProgress(100);
+      setUploadStage('done');
+      setTimeout(() => {
+        resetAndClose();
+      }, 600);
+    } catch {
+      clearInterval(progressInterval);
+      setUploadStage('idle');
+      setUploadProgress(0);
+    }
   };
 
   const resetAndClose = () => {
     setCaption('');
     setTextContent('');
     setProposalText('');
-    setSelectedFile(null);
-    setPreview(null);
+    clearFile();
     setMode('photo');
     setSelectedGradient(0);
     setIsPublic(true);
+    setUploadStage('idle');
+    setUploadProgress(0);
     onClose();
   };
 
   const MODES: { key: PostMode; label: string; icon: React.ReactNode }[] = [
     { key: 'photo', label: 'Photo', icon: <ImagePlus size={15} /> },
+    { key: 'video', label: 'Video', icon: <Video size={15} /> },
     { key: 'text', label: 'Text', icon: <Type size={15} /> },
     { key: 'proposal', label: 'Proposal', icon: <Megaphone size={15} /> },
   ];
 
+  const progressLabel =
+    uploadStage === 'uploading' ? (mode === 'video' ? 'Uploading video…' : 'Uploading…') :
+    uploadStage === 'saving' ? 'Saving post…' :
+    uploadStage === 'done' ? 'Posted!' : '';
+
   return (
     <div
       className="fixed inset-0 z-[100] bg-[#191c1e]/30 backdrop-blur-sm flex items-center justify-center p-4"
-      onClick={resetAndClose}
+      onClick={isPosting ? undefined : resetAndClose}
     >
       <div
         className="w-full max-w-lg bg-white rounded-[2rem] shadow-[0_40px_80px_rgba(25,28,30,0.15)] relative flex flex-col overflow-hidden animate-in zoom-in-95 duration-200"
@@ -125,19 +199,24 @@ export default function CreatePostModal({ isOpen, onClose, onSubmit }: CreatePos
           <h2 className="text-xl font-extrabold text-[#191c1e] tracking-tight" style={{ fontFamily: '"Plus Jakarta Sans", sans-serif' }}>
             Create Post
           </h2>
-          <button onClick={resetAndClose} className="w-9 h-9 bg-[#f2f4f6] text-[#777587] rounded-full flex items-center justify-center hover:bg-[#e0e3e5] hover:text-[#191c1e] transition-colors">
+          <button
+            onClick={resetAndClose}
+            disabled={isPosting}
+            className="w-9 h-9 bg-[#f2f4f6] text-[#777587] rounded-full flex items-center justify-center hover:bg-[#e0e3e5] hover:text-[#191c1e] transition-colors disabled:opacity-40"
+          >
             <X size={18} strokeWidth={2.5} />
           </button>
         </div>
 
-        {/* ── Mode Toggle (3 tabs) ── */}
+        {/* ── Mode Toggle (4 tabs) ── */}
         <div className="px-8 pb-5">
-          <div className="flex items-center bg-[#f2f4f6] p-1 rounded-xl w-fit">
+          <div className="flex items-center bg-[#f2f4f6] p-1 rounded-xl w-fit gap-0.5">
             {MODES.map((m) => (
               <button
                 key={m.key}
-                onClick={() => setMode(m.key)}
-                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-bold transition-all ${
+                onClick={() => { setMode(m.key); clearFile(); }}
+                disabled={isPosting}
+                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-bold transition-all ${
                   mode === m.key
                     ? 'bg-white text-[#0434c6] shadow-sm'
                     : 'text-[#777587] hover:text-[#464555]'
@@ -151,15 +230,16 @@ export default function CreatePostModal({ isOpen, onClose, onSubmit }: CreatePos
         </div>
 
         {/* ── Content Area ── */}
-        <div className="px-8 pb-4 flex flex-col gap-4 max-h-[60vh] overflow-y-auto">
+        <div className="px-8 pb-4 flex flex-col gap-4 max-h-[55vh] overflow-y-auto">
+
           {/* ─ PHOTO MODE ─ */}
           {mode === 'photo' && (
             <>
               {preview ? (
                 <div className="relative rounded-2xl overflow-hidden border border-[#f2f4f6]">
-                  <img src={preview} alt="Preview" className="w-full max-h-80 object-cover" />
+                  <img src={preview} alt="Preview" className="w-full max-h-72 object-cover" />
                   <button
-                    onClick={() => { setSelectedFile(null); setPreview(null); }}
+                    onClick={clearFile}
                     className="absolute top-3 right-3 w-8 h-8 bg-black/40 text-white rounded-full flex items-center justify-center hover:bg-black/60 transition-colors backdrop-blur-sm"
                   >
                     <X size={16} />
@@ -169,7 +249,7 @@ export default function CreatePostModal({ isOpen, onClose, onSubmit }: CreatePos
                 <div
                   onDragOver={(e) => e.preventDefault()}
                   onDrop={handleDrop}
-                  onClick={() => fileInputRef.current?.click()}
+                  onClick={() => imageInputRef.current?.click()}
                   className="border-2 border-dashed border-[#e0e3e5] rounded-2xl p-10 flex flex-col items-center justify-center text-center cursor-pointer hover:border-[#0434c6]/30 hover:bg-[#f7f9fb] transition-all group"
                 >
                   <div className="w-14 h-14 bg-[#f2f4f6] rounded-2xl flex items-center justify-center mb-4 group-hover:bg-[#0434c6]/10 transition-colors">
@@ -178,11 +258,66 @@ export default function CreatePostModal({ isOpen, onClose, onSubmit }: CreatePos
                   <span className="text-sm font-bold text-[#464555] mb-1" style={{ fontFamily: '"Plus Jakarta Sans", sans-serif' }}>
                     Drag & drop or click to upload
                   </span>
-                  <div className="flex items-center gap-2 mt-2">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-[#b5b3c3] bg-[#f2f4f6] px-2 py-0.5 rounded">16:9</span>
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-[#b5b3c3] bg-[#f2f4f6] px-2 py-0.5 rounded">4:5</span>
+                  <span className="text-xs text-[#b5b3c3] font-medium">JPEG · PNG · WebP · Max 10 MB</span>
+                  <input
+                    ref={imageInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    className="hidden"
+                    onChange={handleImageChange}
+                  />
+                </div>
+              )}
+              <textarea
+                value={caption}
+                onChange={(e) => setCaption(e.target.value)}
+                rows={2}
+                className="w-full bg-transparent text-[#191c1e] text-sm font-medium resize-none outline-none placeholder-[#b5b3c3] px-1"
+                placeholder="Write a caption…"
+                style={{ fontFamily: '"Plus Jakarta Sans", sans-serif' }}
+              />
+            </>
+          )}
+
+          {/* ─ VIDEO MODE ─ */}
+          {mode === 'video' && (
+            <>
+              {preview ? (
+                <div className="relative rounded-2xl overflow-hidden border border-[#f2f4f6] bg-black">
+                  <video
+                    src={preview}
+                    controls
+                    className="w-full max-h-72 object-contain"
+                    preload="metadata"
+                  />
+                  <button
+                    onClick={clearFile}
+                    className="absolute top-3 right-3 w-8 h-8 bg-black/50 text-white rounded-full flex items-center justify-center hover:bg-black/70 transition-colors backdrop-blur-sm"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              ) : (
+                <div
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={handleDrop}
+                  onClick={() => videoInputRef.current?.click()}
+                  className="border-2 border-dashed border-[#e0e3e5] rounded-2xl p-10 flex flex-col items-center justify-center text-center cursor-pointer hover:border-[#0434c6]/30 hover:bg-[#f7f9fb] transition-all group"
+                >
+                  <div className="w-14 h-14 bg-[#f2f4f6] rounded-2xl flex items-center justify-center mb-4 group-hover:bg-[#0434c6]/10 transition-colors">
+                    <Video size={24} className="text-[#777587] group-hover:text-[#0434c6] transition-colors" />
                   </div>
-                  <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileSelect} />
+                  <span className="text-sm font-bold text-[#464555] mb-1" style={{ fontFamily: '"Plus Jakarta Sans", sans-serif' }}>
+                    Drag & drop or click to upload
+                  </span>
+                  <span className="text-xs text-[#b5b3c3] font-medium">MP4 · WebM · Max 100 MB</span>
+                  <input
+                    ref={videoInputRef}
+                    type="file"
+                    accept="video/mp4,video/webm"
+                    className="hidden"
+                    onChange={handleVideoChange}
+                  />
                 </div>
               )}
               <textarea
@@ -241,29 +376,64 @@ export default function CreatePostModal({ isOpen, onClose, onSubmit }: CreatePos
                   rows={4}
                   maxLength={500}
                   className="w-full bg-white text-[#191c1e] text-sm font-medium resize-none outline-none placeholder-[#b5b3c3] p-4 rounded-xl border border-amber-200/60 focus:ring-2 focus:ring-amber-300/50"
-                  placeholder="Describe your proposal… e.g. 'Let's plan a family trip to Rajasthan this December!'"
+                  placeholder="Describe your proposal…"
                   style={{ fontFamily: '"Plus Jakarta Sans", sans-serif' }}
                 />
                 <span className="text-[10px] text-amber-500 font-bold mt-1 block text-right">{proposalText.length}/500</span>
               </div>
             </div>
           )}
+
+          {/* ─ File Error ─ */}
+          {fileError && (
+            <div className="flex items-center gap-2 px-4 py-3 bg-red-50 border border-red-200/60 rounded-xl">
+              <AlertCircle size={16} className="text-red-500 flex-shrink-0" />
+              <p className="text-xs text-red-600 font-semibold">{fileError}</p>
+            </div>
+          )}
         </div>
 
+        {/* ── Progress Bar (shown during upload) ── */}
+        {isPosting && (
+          <div className="px-8 pb-2">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-xs font-bold text-[#464555] flex items-center gap-1.5">
+                {uploadStage === 'done'
+                  ? <><CheckCircle2 size={13} className="text-green-500" /> {progressLabel}</>
+                  : <><Loader2 size={13} className="animate-spin text-[#0434c6]" /> {progressLabel}</>
+                }
+              </span>
+              <span className="text-xs text-[#b5b3c3] font-bold">{uploadProgress}%</span>
+            </div>
+            <div className="w-full h-1.5 bg-[#f2f4f6] rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all duration-300 ${
+                  uploadStage === 'done'
+                    ? 'bg-gradient-to-r from-green-400 to-emerald-500'
+                    : 'bg-gradient-to-r from-[#0434c6] to-[#3050de]'
+                }`}
+                style={{ width: `${uploadProgress}%` }}
+              />
+            </div>
+          </div>
+        )}
+
         {/* ── Privacy Toggle + Post Button ── */}
-        <div className="px-8 pb-8 flex flex-col gap-3">
+        <div className="px-8 pb-8 pt-2 flex flex-col gap-3">
           {/* Privacy Pill */}
-          <button
-            onClick={() => setIsPublic(!isPublic)}
-            className="flex items-center gap-2 self-start px-3 py-1.5 rounded-full bg-[#f2f4f6] text-xs font-bold transition-colors hover:bg-[#e0e3e5]"
-            style={{ fontFamily: '"Plus Jakarta Sans", sans-serif' }}
-          >
-            {isPublic ? (
-              <><Globe size={13} className="text-[#0434c6]" /> <span className="text-[#0434c6]">Public</span></>
-            ) : (
-              <><Lock size={13} className="text-[#777587]" /> <span className="text-[#777587]">Private</span></>
-            )}
-          </button>
+          {!isPosting && (
+            <button
+              onClick={() => setIsPublic(!isPublic)}
+              className="flex items-center gap-2 self-start px-3 py-1.5 rounded-full bg-[#f2f4f6] text-xs font-bold transition-colors hover:bg-[#e0e3e5]"
+              style={{ fontFamily: '"Plus Jakarta Sans", sans-serif' }}
+            >
+              {isPublic ? (
+                <><Globe size={13} className="text-[#0434c6]" /> <span className="text-[#0434c6]">Public</span></>
+              ) : (
+                <><Lock size={13} className="text-[#777587]" /> <span className="text-[#777587]">Private</span></>
+              )}
+            </button>
+          )}
 
           <button
             onClick={handlePost}
@@ -272,7 +442,7 @@ export default function CreatePostModal({ isOpen, onClose, onSubmit }: CreatePos
             style={{ fontFamily: '"Plus Jakarta Sans", sans-serif' }}
           >
             {isPosting ? (
-              <><Loader2 size={18} className="animate-spin" /> Posting…</>
+              <><Loader2 size={18} className="animate-spin" /> {progressLabel || 'Posting…'}</>
             ) : (
               mode === 'proposal' ? 'Submit Proposal' : 'Post'
             )}

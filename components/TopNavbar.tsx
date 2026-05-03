@@ -6,10 +6,12 @@ import { Search, Bell, Settings, User, LogOut, Menu } from 'lucide-react';
 import Link from 'next/link';
 
 import NotificationBell from '@/components/NotificationBell';
+import { useProfile } from '@/lib/hooks/useProfile';
 
 export default function TopNavbar() {
   const router = useRouter();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const { profile, isLoading: isProfileLoading } = useProfile();
   const menuRef = useRef<HTMLDivElement>(null);
 
   // Close the dropdown if the user clicks anywhere outside of it
@@ -36,6 +38,10 @@ export default function TopNavbar() {
     setIsProfileOpen(false);
     router.push('/profile');
   };
+
+  const userDisplayName = profile?.full_name || profile?.username || 'Family Member';
+  const userAvatar = profile?.avatar_url;
+  const userInitial = userDisplayName.charAt(0).toUpperCase();
 
   return (
     <nav className="fixed top-0 left-0 w-full h-20 bg-white/80 backdrop-blur-2xl z-40 border-b border-[#f2f4f6]/80 flex items-center justify-between px-4 md:px-8 transition-all">
@@ -82,17 +88,20 @@ export default function TopNavbar() {
             onClick={() => setIsProfileOpen(!isProfileOpen)}
             className="w-10 h-10 rounded-full bg-[#fcdbb6] border-2 border-white shadow-sm hover:shadow-md transition-all flex items-center justify-center overflow-hidden focus:outline-none focus:ring-2 focus:ring-[#0434c6] focus:ring-offset-2"
           >
-            {/* Fallback Initials - You can replace this with an <img> tag later! */}
-            <span className="text-[#d97c27] font-extrabold text-sm uppercase">A</span>
+            {userAvatar ? (
+              <img src={userAvatar} alt={userDisplayName} className="w-full h-full object-cover" />
+            ) : (
+              <span className="text-[#d97c27] font-extrabold text-sm uppercase">{userInitial}</span>
+            )}
           </button>
 
           {/* The Floating Card */}
           {isProfileOpen && (
             <div className="absolute right-0 mt-3 w-56 bg-white rounded-2xl shadow-[0_20px_60px_rgba(25,28,30,0.1)] border border-[#f2f4f6] py-2 flex flex-col z-50 animate-in fade-in slide-in-from-top-2 duration-200">
               
-              <div className="px-5 py-3 border-b border-[#f2f4f6] mb-1">
-                <p className="text-sm font-extrabold text-[#191c1e] truncate">Abhishek</p>
-                <p className="text-[10px] font-bold text-[#777587] uppercase tracking-widest mt-0.5">Family Curator</p>
+              <div className="px-5 py-3 border-b border-[#f2f4f6] mb-1 text-left">
+                <p className="text-sm font-extrabold text-[#191c1e] truncate">{userDisplayName}</p>
+                <p className="text-[10px] font-bold text-[#777587] uppercase tracking-widest mt-0.5">Family Member</p>
               </div>
 
               <button 

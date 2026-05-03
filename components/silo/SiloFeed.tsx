@@ -15,6 +15,7 @@ export default function SiloFeed({ siloId }: SiloFeedProps) {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [posts, setPosts] = useState<Post[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [moderationError, setModerationError] = useState<string | null>(null);
 
   // ── Fetch Feed ──
   const fetchFeed = useCallback(async () => {
@@ -24,29 +25,38 @@ export default function SiloFeed({ siloId }: SiloFeedProps) {
 
       const mapped: Post[] = raw.map((p: any) => {
         const profile = p.profiles || {};
-        // Detect post type — fallback to old __text__ convention for pre-migration posts
-        const postType = p.post_type || ((!p.image_path || p.image_path === '__text__') ? 'text' : 'photo');
-        const isTextPost = postType === 'text';
-        const isProposal = postType === 'proposal';
+        const rawType = p.post_type || 'photo';
+        const isTextPost = rawType === 'text' || p.image_path === '__text__';
+        const isProposal = rawType === 'proposal' || p.image_path === '__proposal__';
+        const isVideo = rawType === 'video' || p.image_path === '__video__';
+        const postType = isTextPost ? 'text' : isProposal ? 'proposal' : isVideo ? 'video' : 'photo';
 
-        // Build public URL for photo posts
+        // Resolve media URLs from Supabase Storage
         let imageUrl: string | undefined;
-        if (!isTextPost && !isProposal && p.image_path && p.image_path !== '__text__') {
+        let videoUrl: string | undefined;
+        const hasRealPath = p.image_path && !p.image_path.startsWith('__');
+
+        if (hasRealPath) {
           const { data } = supabase.storage.from('group-media').getPublicUrl(p.image_path);
-          imageUrl = data?.publicUrl;
+          if (postType === 'video') {
+            videoUrl = data?.publicUrl;
+          } else {
+            imageUrl = data?.publicUrl;
+          }
         }
 
         const createdAt = p.created_at ? timeAgo(p.created_at) : 'Just now';
 
         return {
           id: p.id,
-          type: postType as 'photo' | 'text' | 'proposal',
+          type: postType as 'photo' | 'text' | 'proposal' | 'video',
           author: {
             name: profile.username || 'Family Member',
             avatar: profile.avatar_url || undefined,
           },
           timestamp: createdAt,
           imageUrl,
+          videoUrl,
           caption: p.caption || undefined,
           textContent: isTextPost ? p.caption : undefined,
           gradient: p.gradient || 'bg-gradient-to-br from-blue-500 to-purple-600',
@@ -61,6 +71,7 @@ export default function SiloFeed({ siloId }: SiloFeedProps) {
           isPublic: p.is_public ?? true,
           isAuthor: p.is_author || false,
           canDelete: p.can_delete || false,
+          moderationStatus: p.moderation_status || 'approved',
         } as Post;
       });
 
@@ -77,54 +88,52 @@ export default function SiloFeed({ siloId }: SiloFeedProps) {
   }, [fetchFeed]);
 
   // ── Create Post Handler ──
-  const handleCreatePost = async (newPost: NewPostPayload) => {
-    try {
-      const token = localStorage.getItem('family_app_token');
-      if (!token) return;
+  const handleCreatePost = async (newPost: NewPostPayload): Promise<void> => {
+    setModerationError(null);
+    const token = localStorage.getItem('family_app_token');
+    if (!token) throw new Error('Not authenticated');
 
+    try {
       if (newPost.type === 'photo' && newPost.imageFile) {
         const { data: userData } = await supabase.auth.getUser(token);
         if (!userData?.user) throw new Error('Auth failed');
-
         const fileExt = newPost.imageFile.name.split('.').pop();
         const fileName = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}.${fileExt}`;
         const filePath = `${userData.user.id}/${fileName}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from('group-media')
-          .upload(filePath, newPost.imageFile);
+        const { error: uploadError } = await supabase.storage.from('group-media').upload(filePath, newPost.imageFile);
         if (uploadError) throw uploadError;
+        await api.post('/posts/', { group_id: siloId, post_type: 'photo', image_path: filePath, caption: newPost.caption || null, is_public: newPost.isPublic });
 
-        await api.post('/posts/', {
-          group_id: siloId,
-          post_type: 'photo',
-          image_path: filePath,
-          caption: newPost.caption || null,
-          is_public: newPost.isPublic,
-        });
+      } else if (newPost.type === 'video' && newPost.videoFile) {
+        const { data: userData } = await supabase.auth.getUser(token);
+        if (!userData?.user) throw new Error('Auth failed');
+        const fileExt = newPost.videoFile.name.split('.').pop();
+        const fileName = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}.${fileExt}`;
+        const filePath = `${userData.user.id}/videos/${fileName}`;
+        const { error: uploadError } = await supabase.storage.from('group-media').upload(filePath, newPost.videoFile);
+        if (uploadError) throw uploadError;
+        await api.post('/posts/', { group_id: siloId, post_type: 'video', video_path: filePath, caption: newPost.caption || null, is_public: newPost.isPublic });
+
       } else if (newPost.type === 'text') {
-        await api.post('/posts/', {
-          group_id: siloId,
-          post_type: 'text',
-          caption: newPost.caption,
-          gradient: newPost.gradient || null,
-          is_public: newPost.isPublic,
-        });
+        await api.post('/posts/', { group_id: siloId, post_type: 'text', caption: newPost.caption, gradient: newPost.gradient || null, is_public: newPost.isPublic });
+
       } else if (newPost.type === 'proposal') {
-        await api.post('/posts/', {
-          group_id: siloId,
-          post_type: 'proposal',
-          caption: newPost.caption,
-          is_public: newPost.isPublic,
-        });
+        await api.post('/posts/', { group_id: siloId, post_type: 'proposal', caption: newPost.caption, is_public: newPost.isPublic });
       }
 
-      // Refresh the feed
       setIsLoading(true);
       await fetchFeed();
       setShowCreateModal(false);
+
     } catch (err: any) {
-      console.error('Failed to create post:', err);
+      // Handle content moderation rejection (422)
+      const detail = err?.response?.data?.detail;
+      if (detail?.error === 'content_flagged') {
+        setModerationError(detail.message || 'Your post was flagged by content moderation.');
+        // Re-throw so the modal progress bar resets
+        throw err;
+      }
+      throw err;
     }
   };
 
@@ -182,6 +191,20 @@ export default function SiloFeed({ siloId }: SiloFeedProps) {
       {!isLoading && posts.map((post) => (
         <FeedCard key={post.id} post={post} onDelete={(id) => setPosts((prev) => prev.filter(p => p.id !== id))} />
       ))}
+
+      {/* ── Moderation Error Toast ── */}
+      {moderationError && (
+        <div className="bg-red-50 border border-red-200/60 rounded-2xl px-5 py-4 flex items-start gap-3">
+          <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+            <span className="text-red-500 text-base">🚫</span>
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-extrabold text-red-700" style={{ fontFamily: '"Plus Jakarta Sans", sans-serif' }}>Post Blocked by Content Moderation</p>
+            <p className="text-xs text-red-600/80 font-medium mt-0.5">{moderationError}</p>
+          </div>
+          <button onClick={() => setModerationError(null)} className="text-red-400 hover:text-red-600 text-lg leading-none mt-0.5">&times;</button>
+        </div>
+      )}
 
       {/* ── Create Post Modal ── */}
       <CreatePostModal
