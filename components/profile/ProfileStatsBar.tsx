@@ -10,16 +10,10 @@ interface ProfileStatsBarProps {
   membersList: any[];
   onStartDM: (peerId: string, peerName: string) => void;
   onViewProfile: (id: string) => void;
+  recentMemories?: any[];
 }
 
-const mockGallery = [
-  "https://images.unsplash.com/photo-1544377193-33dcf4d68fb5?w=200&h=200&fit=crop",
-  "https://images.unsplash.com/photo-1504280390224-0062eb142f36?w=200&h=200&fit=crop",
-  "https://images.unsplash.com/photo-1511895426328-dc8714191300?w=200&h=200&fit=crop",
-  "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=200&h=200&fit=crop",
-];
-
-export default function ProfileStatsBar({ stats, silosList, membersList, onStartDM, onViewProfile }: ProfileStatsBarProps) {
+export default function ProfileStatsBar({ stats, silosList, membersList, recentMemories = [], onStartDM, onViewProfile }: ProfileStatsBarProps) {
   const router = useRouter();
   const popoverRef = useRef<HTMLDivElement>(null);
   const [activePopover, setActivePopover] = useState<'members' | 'silos' | 'gallery' | null>(null);
@@ -129,11 +123,23 @@ export default function ProfileStatsBar({ stats, silosList, membersList, onStart
                 <h4 className="text-xs font-extrabold text-[#191c1e] uppercase tracking-widest">Recent Uploads</h4>
               </div>
               <div className="grid grid-cols-3 gap-2">
-                {mockGallery.map((url, idx) => (
-                  <div key={idx} className="aspect-square rounded-xl overflow-hidden shadow-sm hover:scale-105 transition-transform cursor-pointer">
-                    <img src={url} alt={`Preview ${idx}`} className="w-full h-full object-cover" />
-                  </div>
-                ))}
+                {recentMemories.length === 0 ? (
+                  <p className="col-span-3 text-center text-xs text-[#b5b3c3] py-4 font-bold">No posts uploaded yet.</p>
+                ) : (
+                  recentMemories.map((mem) => (
+                    <div key={mem.id} className="aspect-square rounded-xl overflow-hidden shadow-sm bg-black hover:scale-105 transition-transform cursor-pointer relative">
+                      {mem.url ? (
+                        mem.type === 'video' ? (
+                          <video src={mem.url} className="w-full h-full object-cover" muted loop autoPlay playsInline />
+                        ) : (
+                          <img src={mem.url} alt={mem.caption || "Memory"} className="w-full h-full object-cover" />
+                        )
+                      ) : (
+                        <div className="w-full h-full bg-gradient-to-br from-[#0434c6] to-[#3050de]" />
+                      )}
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           </div>

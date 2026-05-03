@@ -88,7 +88,8 @@ export default function AuthPage() {
         response = await axios.post(`${apiUrl}/auth/signup`, { email, password, username });
 
         if (!response.data.access_token) {
-          response = await axios.post(`${apiUrl}/auth/login`, { email, password });
+          // Fix: The login API expects 'identifier', not 'email'
+          response = await axios.post(`${apiUrl}/auth/login`, { identifier: email, password });
         }
       }
 
@@ -116,7 +117,7 @@ export default function AuthPage() {
 
 
       // 2. Extract the exact error message your Python backend sent over
-      const message = error.response?.data?.detail || 'Invalid email or password. Please try again.';
+      const message = error.response?.data?.detail || 'Invalid credentials or validation failed.';
 
       // 3. Set it to your React state so the user sees it!
       setErrorMessage(typeof message === 'string' ? message : JSON.stringify(message));
@@ -274,7 +275,7 @@ export default function AuthPage() {
               {/* Username Input (Signup Only) */}
               {!isLogin && (
                 <div className="space-y-1.5">
-                  <label className="block text-sm font-bold text-[#464555] ml-1" style={{ fontFamily: '"Manrope", sans-serif' }}>Full Name</label>
+                  <label className="block text-sm font-bold text-[#464555] ml-1" style={{ fontFamily: '"Manrope", sans-serif' }}>Username</label>
                   <div className="relative group">
                     <input
                       type="text"
@@ -282,7 +283,7 @@ export default function AuthPage() {
                       value={username}
                       onChange={(e) => setUsername(e.target.value)}
                       className="w-full px-5 py-3.5 pl-12 bg-white/50 border-none rounded-xl focus:ring-2 focus:ring-[#0434c6]/50 focus:bg-white transition-all text-[#191c1e] outline-none font-medium placeholder-[#777587]"
-                      placeholder="Johnathan Doe"
+                      placeholder="jon_doe"
                     />
                     <User size={18} className="absolute left-4 top-4 text-[#777587]" />
                   </div>

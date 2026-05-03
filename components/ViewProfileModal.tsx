@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { X, MapPin, Calendar } from 'lucide-react';
 import api from '@/lib/axios';
+import ProfileMemories from './profile/ProfileMemories';
 
 interface ViewProfileModalProps {
   userId: string | null;
@@ -11,22 +12,24 @@ interface ViewProfileModalProps {
 }
 
 export default function ViewProfileModal({ userId, isOpen, onClose }: ViewProfileModalProps) {
-  const [profile, setProfile] = useState<any>(null);
+  const [profileData, setProfileData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (isOpen && userId) {
       setLoading(true);
       api.get(`/users/${userId}`)
-        .then(res => setProfile(res.data))
+        .then(res => setProfileData(res.data))
         .catch(err => console.error("Failed to load profile", err))
         .finally(() => setLoading(false));
     } else {
-      setProfile(null);
+      setProfileData(null);
     }
   }, [isOpen, userId]);
 
   if (!isOpen) return null;
+
+  const profile = profileData?.profile;
 
   return (
     <div className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-200">
@@ -109,6 +112,13 @@ export default function ViewProfileModal({ userId, isOpen, onClose }: ViewProfil
                       </span>
                     ))}
                   </div>
+                </div>
+              )}
+
+              {/* Recent Memories Timeline */}
+              {profileData?.recent_memories && profileData.recent_memories.length > 0 && (
+                <div className="mt-8 pt-6 border-t border-[#f2f4f6]">
+                  <ProfileMemories profileId={profile?.id} />
                 </div>
               )}
             </div>

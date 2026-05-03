@@ -1,17 +1,19 @@
 'use client';
 
 import { useState } from 'react';
-import { Heart, MessageCircle, Share2, MoreHorizontal, ThumbsUp, ThumbsDown, BadgeCheck, CheckCircle2, Send, Loader2, Trash2, ShieldAlert, MapPin, Lock } from 'lucide-react';
+import { Heart, MessageCircle, Share2, MoreHorizontal, ThumbsUp, ThumbsDown, BadgeCheck, CheckCircle2, Send, Loader2, Trash2, ShieldAlert, MapPin, Lock, Clock, ShieldX } from 'lucide-react';
 import api from '@/lib/axios';
 
 export interface Post {
   id: string;
-  type: 'photo' | 'text' | 'proposal';
+  type: 'photo' | 'text' | 'proposal' | 'video';
   author: { name: string; avatar?: string };
   timestamp: string;
   // Photo
   imageUrl?: string;
   caption?: string;
+  // Video
+  videoUrl?: string;
   // Text
   textContent?: string;
   gradient?: string;
@@ -31,6 +33,9 @@ export interface Post {
   isAuthor?: boolean;
   canDelete?: boolean;
   siloName?: string;
+  siloId?: string;
+  // Moderation
+  moderationStatus?: 'approved' | 'pending' | 'quarantined';
 }
 
 interface FeedCardProps {
@@ -148,6 +153,24 @@ export default function FeedCard({ post, onDelete, showOriginSilo, showPrivacyLo
 
   return (
     <div className="bg-white rounded-2xl border border-[#f2f4f6] shadow-[0_4px_24px_rgba(25,28,30,0.04)] overflow-hidden flex flex-col relative">
+
+      {/* ── Moderation Status Banner ── */}
+      {post.moderationStatus === 'pending' && (
+        <div className="flex items-center gap-2 px-5 py-2.5 bg-amber-50 border-b border-amber-100">
+          <Loader2 size={13} className="animate-spin text-amber-500 flex-shrink-0" />
+          <span className="text-xs font-bold text-amber-700" style={{ fontFamily: '"Plus Jakarta Sans", sans-serif' }}>
+            Pending Review — visible only to you until approved
+          </span>
+        </div>
+      )}
+      {post.moderationStatus === 'quarantined' && post.isAuthor && (
+        <div className="flex items-center gap-2 px-5 py-2.5 bg-red-50 border-b border-red-100">
+          <ShieldX size={13} className="text-red-500 flex-shrink-0" />
+          <span className="text-xs font-bold text-red-700" style={{ fontFamily: '"Plus Jakarta Sans", sans-serif' }}>
+            Flagged by content moderation — this post is not visible to others
+          </span>
+        </div>
+      )}
       {/* ── Origin Badge (For Aggregated Feeds) ── */}
       {showOriginSilo && post.siloName && (
         <div className="px-5 pt-4 pb-1">
@@ -238,10 +261,26 @@ export default function FeedCard({ post, onDelete, showOriginSilo, showPrivacyLo
       </div>
 
       {/* ── Content ── */}
+      {/* ── Photo Content ── */}
       {post.type === 'photo' && post.imageUrl && (
         <div className="px-5">
           <div className="rounded-xl overflow-hidden bg-[#f2f4f6]">
             <img src={post.imageUrl} alt={post.caption || 'Post'} className="w-full object-cover max-h-[480px]" />
+          </div>
+        </div>
+      )}
+
+      {/* ── Video Content ── */}
+      {post.type === 'video' && post.videoUrl && (
+        <div className="px-5">
+          <div className="rounded-xl overflow-hidden bg-black">
+            <video
+              src={post.videoUrl}
+              controls
+              preload="metadata"
+              className="w-full max-h-[480px] object-contain"
+              style={{ display: 'block' }}
+            />
           </div>
         </div>
       )}

@@ -9,46 +9,61 @@ import { supabase } from '@/lib/supabase';
 
 const fetcher = (url: string) => api.get(url).then(r => r.data);
 
-export default function FeedList() {
+interface FeedListProps {
+  endpoint?: string;
+  hideFilters?: boolean;
+}
+
+export default function FeedList({ endpoint = '/posts/feed/home', hideFilters = false }: FeedListProps) {
   const [posts, setPosts] = useState<Post[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeFilterId, setActiveFilterId] = useState<string>('all');
 
-  // Fetch Silos for the filter pills
-  const { data: silos = [] } = useSWR('/silos', fetcher, {
+  // Fetch Silos for the filter pills (only if we need them)
+  const { data: silos = [] } = useSWR(hideFilters ? null : '/silos', fetcher, {
     revalidateOnFocus: false,
     dedupingInterval: 60000,
   });
 
-  // Fetch Global Feed
+  // Fetch Feed
   const fetchFeed = useCallback(async () => {
     try {
-      const res = await api.get('/posts/feed/home');
+      const res = await api.get(endpoint);
       const raw = res.data?.posts || [];
 
       const mapped: Post[] = raw.map((p: any) => {
         const profile = p.profiles || {};
-        const postType = p.post_type || ((!p.image_path || p.image_path === '__text__') ? 'text' : 'photo');
-        const isTextPost = postType === 'text';
-        const isProposal = postType === 'proposal';
+        const rawType = p.post_type || 'photo';
+        const isTextPost = rawType === 'text' || p.image_path === '__text__';
+        const isProposal = rawType === 'proposal' || p.image_path === '__proposal__';
+        const isVideo = rawType === 'video' || p.image_path === '__video__';
+        const postType = isTextPost ? 'text' : isProposal ? 'proposal' : isVideo ? 'video' : 'photo';
 
         let imageUrl: string | undefined;
-        if (!isTextPost && !isProposal && p.image_path && p.image_path !== '__text__') {
+        let videoUrl: string | undefined;
+        const hasRealPath = p.image_path && !p.image_path.startsWith('__');
+
+        if (hasRealPath) {
           const { data } = supabase.storage.from('group-media').getPublicUrl(p.image_path);
-          imageUrl = data?.publicUrl;
+          if (postType === 'video') {
+            videoUrl = data?.publicUrl;
+          } else {
+            imageUrl = data?.publicUrl;
+          }
         }
 
         const createdAt = p.created_at ? timeAgo(p.created_at) : 'Just now';
 
         return {
           id: p.id,
-          type: postType as 'photo' | 'text' | 'proposal',
+          type: postType as 'photo' | 'text' | 'proposal' | 'video',
           author: {
             name: profile.username || 'Family Member',
             avatar: profile.avatar_url || undefined,
           },
           timestamp: createdAt,
           imageUrl,
+          videoUrl,
           caption: p.caption || undefined,
           textContent: isTextPost ? p.caption : undefined,
           gradient: p.gradient || 'bg-gradient-to-br from-blue-500 to-purple-600',
@@ -66,35 +81,32 @@ export default function FeedList() {
           isAuthor: p.is_author || false,
           canDelete: p.can_delete || false,
           siloName: p.silo_name,
-          siloId: p.group_id, // temporarily store to filter
+          siloId: p.group_id,
+          moderationStatus: p.moderation_status || 'approved',
         };
       });
 
       setPosts(mapped);
     } catch (err: any) {
       console.error('Failed to fetch global feed:', err);
-      // Alert the user with the EXACT backend error message
-      if (err.response?.data?.detail) {
-        alert("BACKEND FEED ERROR:\n" + err.response.data.detail);
-      }
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [endpoint]);
 
   useEffect(() => {
     fetchFeed();
   }, [fetchFeed]);
 
   // Filter logic
-  const displayedPosts = activeFilterId === 'all'
+  const displayedPosts = activeFilterId === 'all' || hideFilters
     ? posts
     : posts.filter((p: any) => p.siloId === activeFilterId);
 
   return (
     <div className="flex flex-col gap-4 max-w-2xl mx-auto w-full pt-4 md:pt-6">
       {/* ── Filters ── */}
-      {silos.length > 0 && (
+      {!hideFilters && silos.length > 0 && (
         <div className="flex items-center gap-2 overflow-x-auto pb-2 no-scrollbar px-1">
           <button
             onClick={() => setActiveFilterId('all')}

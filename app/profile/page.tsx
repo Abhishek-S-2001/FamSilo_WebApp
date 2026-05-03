@@ -15,7 +15,7 @@ import api from '@/lib/axios';
 import { useChat } from '@/lib/context/ChatContext';
 
 export default function ProfilePage() {
-  const { profile, stats, silosList, membersList, isLoading, mutate } = useProfile();
+  const { profile, stats, recent_memories, debug_all_posts, debug_current_user_id, silosList, membersList, isLoading, mutate } = useProfile();
   const { openChatWith } = useChat();
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -96,6 +96,7 @@ const handleStartDM = (peerId: string, peerName: string) => {
                 stats={stats}
                 silosList={silosList}
                 membersList={membersList}
+                recentMemories={recent_memories}
                 onStartDM={handleStartDM}
                 onViewProfile={setViewProfileId}
               />
@@ -113,7 +114,7 @@ const handleStartDM = (peerId: string, peerName: string) => {
               />
             </div>
             <div className="col-span-1 lg:col-span-8">
-              <ProfileMemories />
+              <ProfileMemories profileId={profile?.id} />
             </div>
           </div>
         </section>
