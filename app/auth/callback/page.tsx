@@ -65,26 +65,40 @@ export default function AuthCallbackPage() {
 
   async function reconcileAndRedirect(session: any) {
     // Ensure profile exists in the database for the Python backend
-    const { data: profiles } = await supabase
+    const { data: profiles, error: fetchError } = await supabase
       .from('profiles')
       .select('id')
       .eq('id', session.user.id);
 
+    if (fetchError) {
+      console.error('[Auth Callback] Failed to fetch profile:', fetchError.message);
+    }
+
     if (!profiles || profiles.length === 0) {
       const metadata = session.user.user_metadata;
-      const name =
+      const baseName =
         metadata?.full_name?.replace(/\s/g, '').toLowerCase() ||
         session.user.email?.split('@')[0] ||
         'user';
-      
-      await supabase.from('profiles').insert({
-        id: session.user.id,
-        username: name + Math.floor(1000 + Math.random() * 9000),
-        email: session.user.email,
-        full_name: metadata?.full_name || name,
-        avatar_url: metadata?.avatar_url || metadata?.picture || null,
-        terms_accepted: false,
-      });
+
+      // Use upsert to handle any race condition where profile may have just been created
+      const { error: upsertError } = await supabase.from('profiles').upsert(
+        {
+          id: session.user.id,
+          username: baseName + Math.floor(1000 + Math.random() * 9000),
+          email: session.user.email,
+          full_name: metadata?.full_name || baseName,
+          avatar_url: metadata?.avatar_url || metadata?.picture || null,
+          terms_accepted: false,
+        },
+        { onConflict: 'id', ignoreDuplicates: true }
+      );
+
+      if (upsertError) {
+        // Log the error but do NOT block the user — profile may exist via a trigger
+        console.error('[Auth Callback] Profile upsert failed:', upsertError.message, upsertError.details);
+        throw new Error(`Profile creation failed: ${upsertError.message}`);
+      }
     }
 
     // Save token for the Python backend axios interceptor

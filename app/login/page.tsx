@@ -101,6 +101,14 @@ export default function AuthPage() {
 
       localStorage.setItem('family_app_token', access_token);
 
+      // Decode JWT to extract user_id (sub), keeping parity with the OAuth callback flow
+      try {
+        const payload = JSON.parse(atob(access_token.split('.')[1]));
+        if (payload?.sub) localStorage.setItem('user_id', payload.sub);
+      } catch {
+        // Non-fatal: user_id extraction failed, app will still work
+      }
+
       const pendingInviteToken = sessionStorage.getItem('pending_invite_token');
 
       if (pendingInviteToken) {
