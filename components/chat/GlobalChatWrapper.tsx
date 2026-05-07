@@ -1,22 +1,44 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { useChat } from '@/lib/context/ChatContext';
 import GlobalChatButton from '@/components/chat/GlobalChatButton';
 import SiloChatPanel from '@/components/chat/SiloChatPanel';
 import ChatInbox from '@/components/chat/ChatInbox';
+import ConciergeChatPanel from '@/components/ConciergeChatPanel';
 
 export default function GlobalChatWrapper() {
   const { isChatOpen, setIsChatOpen, activeChatId, activeChatName, openChatWith } = useChat();
   const pathname = usePathname();
+  const [isConciergeOpen, setIsConciergeOpen] = useState(false);
 
-  // Hide the global chat button on login, callback, reset-password, and docs pages
-  if (pathname === '/login' || pathname === '/docs' || pathname === '/auth/callback' || pathname === '/reset-password' || pathname?.startsWith('/auth/')) {
+  // Listen for the AI Concierge trigger from the Navbar button
+  useEffect(() => {
+    const handler = () => {
+      setIsConciergeOpen(prev => !prev);
+      setIsChatOpen(false); // Close regular chat if open
+    };
+    window.addEventListener('open-concierge', handler);
+    return () => window.removeEventListener('open-concierge', handler);
+  }, [setIsChatOpen]);
+
+  // Hide on auth pages
+  if (
+    pathname === '/login' ||
+    pathname === '/docs' ||
+    pathname === '/auth/callback' ||
+    pathname === '/reset-password' ||
+    pathname?.startsWith('/auth/')
+  ) {
     return null;
   }
 
+  const currentSiloId = pathname?.startsWith('/silo/')
+    ? pathname.split('/')[2]
+    : null;
+
   const renderChatContent = () => {
-    // 1. Active DM or selected chat from inbox
     if (activeChatId) {
       return (
         <SiloChatPanel
@@ -28,10 +50,7 @@ export default function GlobalChatWrapper() {
         />
       );
     }
-
-    // 2. Inside a silo — show that silo's chat contextually
-    if (pathname?.startsWith('/silo/')) {
-      const currentSiloId = pathname.split('/')[2];
+    if (currentSiloId) {
       return (
         <SiloChatPanel
           siloId={currentSiloId}
@@ -40,22 +59,39 @@ export default function GlobalChatWrapper() {
         />
       );
     }
-
-    // 3. Default — inbox, selecting a chat routes through context
-    return (
-      <ChatInbox
-        onSelectChat={(id) => openChatWith(id, '')}
-      />
-    );
+    return <ChatInbox onSelectChat={(id) => openChatWith(id, '')} />;
   };
+
+  const panelClass = `
+    fixed bottom-28 right-4 md:right-10 z-[100]
+    w-[calc(100vw-2rem)] md:w-[400px] h-[600px]
+    rounded-2xl overflow-hidden flex flex-col
+    bg-[var(--bg-card)] border border-[var(--border-default)]
+    shadow-[var(--shadow-float)] dark:shadow-none
+    animate-slide-up-fade
+  `;
 
   return (
     <>
-      <GlobalChatButton isChatOpen={isChatOpen} setIsChatOpen={setIsChatOpen} />
+      <GlobalChatButton isChatOpen={isChatOpen} setIsChatOpen={(open) => {
+        setIsChatOpen(open);
+        if (open) setIsConciergeOpen(false); // Mutually exclusive
+      }} />
 
+      {/* Regular Chat Panel */}
       {isChatOpen && (
-        <div className="fixed bottom-28 right-10 z-[100] w-[400px] md:w-[400px] h-[600px] shadow-2xl rounded-2xl overflow-hidden border border-gray-100 bg-white flex flex-col">
+        <div className={panelClass}>
           {renderChatContent()}
+        </div>
+      )}
+
+      {/* AI Concierge Panel */}
+      {isConciergeOpen && (
+        <div className={panelClass} style={{ right: isChatOpen ? 'calc(1rem + 420px)' : undefined }}>
+          <ConciergeChatPanel
+            onClose={() => setIsConciergeOpen(false)}
+            siloId={currentSiloId}
+          />
         </div>
       )}
     </>

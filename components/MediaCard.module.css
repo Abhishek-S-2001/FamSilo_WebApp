@@ -1,0 +1,77 @@
+/* ═══════════════════════════════════════════════════════════════
+   MediaCard 3D Tilt Effect — CSS Module
+   Hardware-accelerated via transform + CSS custom properties.
+   JS only sets --rx / --ry on mousemove; CSS does the rest.
+   ═══════════════════════════════════════════════════════════════ */
+
+.wrapper {
+  perspective: 1000px;
+  position: relative;
+  border-radius: 0.75rem;
+  overflow: hidden;
+}
+
+.inner {
+  position: relative;
+  transform:
+    rotateX(calc(var(--rx, 0) * 1deg))
+    rotateY(calc(var(--ry, 0) * 1deg));
+  transform-style: preserve-3d;
+  transition: transform 0.15s ease-out;
+  will-change: transform;
+  border-radius: 0.75rem;
+  overflow: hidden;
+}
+
+/* Reset on mouse leave */
+.wrapper:not(:hover) .inner {
+  transform: rotateX(0deg) rotateY(0deg);
+  transition: transform 0.4s ease-out;
+}
+
+/* Glare overlay — moves with cursor via --glare-x / --glare-y */
+.glare {
+  position: absolute;
+  inset: 0;
+  border-radius: 0.75rem;
+  pointer-events: none;
+  background: radial-gradient(
+    circle at calc(var(--glare-x, 50%) * 1%) calc(var(--glare-y, 50%) * 1%),
+    rgba(255, 255, 255, 0.18) 0%,
+    transparent 60%
+  );
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  z-index: 10;
+}
+
+.wrapper:hover .glare {
+  opacity: 1;
+}
+
+/* Media children get subtle zoom on hover via the outer hover-media-zoom class */
+.inner img,
+.inner video {
+  width: 100%;
+  display: block;
+  transition: transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  will-change: transform;
+}
+
+.wrapper:hover .inner img,
+.wrapper:hover .inner video {
+  transform: scale(1.032);
+}
+
+/* ── Reduced Motion ── */
+@media (prefers-reduced-motion: reduce) {
+  .inner,
+  .inner img,
+  .inner video,
+  .glare {
+    transition: none !important;
+    transform: none !important;
+    animation: none !important;
+  }
+  .wrapper:hover .glare { opacity: 0; }
+}

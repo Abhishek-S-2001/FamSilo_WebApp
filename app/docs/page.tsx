@@ -1,744 +1,354 @@
 'use client';
 
 import { useState } from 'react';
+import { X, ArrowRight, Cpu, Globe, Database, Shield, Zap, Bot, MessageSquare, Newspaper, Users } from 'lucide-react';
 
-// ────────────────────────────────────────────────
-// DATA
-// ────────────────────────────────────────────────
+// ─── NODE DATA ─────────────────────────────────────────────────────────────
 
-const NAV_SECTIONS = [
-  { id: 'overview',      label: '📐 System Overview' },
-  { id: 'auth',          label: '🔐 Auth Flow' },
-  { id: 'pages',         label: '📁 Pages' },
-  { id: 'components',    label: '🧩 Components' },
-  { id: 'api',           label: '⚙️ API Reference' },
-  { id: 'database',      label: '🗄️ Database' },
-  { id: 'lib',           label: '📦 Shared Lib' },
-  { id: 'flows',         label: '🔁 Feature Flows' },
-  { id: 'moderation',    label: '🛡️ AI Moderation' },
-  { id: 'issues',        label: '⚡ Known Issues' },
-  { id: 'index',         label: '📂 File Index' },
-];
+type NodeId = 'frontend' | 'auth' | 'backend' | 'websocket' | 'agents' | 'briefing' | 'facilitator' | 'concierge' | 'database' | 'storage';
 
-// ────────────────────────────────────────────────
-// SMALL UI PRIMITIVES
-// ────────────────────────────────────────────────
+interface NodeInfo {
+  id: NodeId;
+  label: string;
+  subtitle: string;
+  icon: React.ReactNode;
+  gradient: string;
+  glow: string;
+  ring: string;
+  connects: NodeId[];
+  badge?: string;
+  detail: {
+    description: string;
+    sections: { title: string; items: string[] }[];
+  };
+}
 
-function SectionTitle({ id, emoji, title }: { id: string; emoji: string; title: string }) {
+const NODES: Record<NodeId, NodeInfo> = {
+  frontend: {
+    id: 'frontend', label: 'Browser / Next.js', subtitle: 'App Router · React 19 · Tailwind v4',
+    icon: <Globe size={22} />, gradient: 'from-blue-600 to-indigo-700', glow: 'shadow-blue-500/50', ring: 'ring-blue-400',
+    connects: ['auth', 'backend', 'websocket'],
+    detail: {
+      description: 'The consumer-facing Next.js 16 app. Uses the App Router with server + client components, a Tailwind v4 design system, hardware-accelerated animations, and a seamless dark/light theme engine.',
+      sections: [
+        { title: 'Key Pages', items: ['/ — Home feed dashboard', '/silo/[id] — Group dashboard (Vault, Members, Chat)', '/profile — User profile & timeline', '/login — Auth (Email / Username / OAuth)', '/docs — This interactive docs page'] },
+        { title: 'Core Libraries', items: ['SWR — Data fetching & caching', 'Axios — JWT-intercepted API client (lib/axios.ts)', 'next-themes — Flicker-free dark mode', 'lucide-react — Icon system'] },
+        { title: 'State & Events', items: ['ChatContext — Global open-chat-with() helper', 'Custom window events: open-briefing, open-concierge, toggle-mobile-sidebar', 'localStorage: family_app_token, user_id, famsilo_briefing_shown'] },
+      ],
+    },
+  },
+  auth: {
+    id: 'auth', label: 'Auth Layer', subtitle: 'Supabase Auth · JWT Bearer',
+    icon: <Shield size={22} />, gradient: 'from-violet-600 to-purple-700', glow: 'shadow-violet-500/50', ring: 'ring-violet-400',
+    connects: ['backend', 'database'],
+    detail: {
+      description: 'Supabase Auth handles all identity. Supports email/password and Google OAuth. The FastAPI backend verifies JWTs on every request using the Supabase Admin SDK.',
+      sections: [
+        { title: 'Login Flow', items: ['User enters email OR username', 'POST /auth/login — backend resolves username → email', 'Supabase sign_in_with_password() returns JWT', 'Token stored as family_app_token in localStorage', 'Axios interceptor attaches Bearer token to all requests'] },
+        { title: 'Signup Rules', items: ['Username: 3-20 chars, lowercase alphanumeric + underscore', 'Username uniqueness checked before Supabase user creation', 'Profile row inserted in profiles table immediately on signup', '7-day cooldown enforced for username changes'] },
+        { title: 'API Endpoints', items: ['POST /auth/signup', 'POST /auth/login', '401/422 → auto-logout + redirect to /login'] },
+      ],
+    },
+  },
+  backend: {
+    id: 'backend', label: 'FastAPI Backend', subtitle: 'Python · Uvicorn · Pydantic v2',
+    icon: <Cpu size={22} />, gradient: 'from-emerald-600 to-green-700', glow: 'shadow-emerald-500/50', ring: 'ring-emerald-400',
+    connects: ['agents', 'database', 'storage', 'websocket'],
+    detail: {
+      description: 'The central API server. Built with FastAPI for automatic OpenAPI docs, strict Pydantic v2 validation, and async background tasks for moderation and AI pipelines.',
+      sections: [
+        { title: 'API Routers', items: ['POST/GET /auth — Signup, Login', 'GET/PUT /users/me — Profile CRUD', 'GET/POST /silos — Group management + invite flows', 'POST/GET /posts — Feed creation with AI moderation', 'GET /notifications — Bell feed + accept/decline invites', 'GET /chat — Inbox, history, search', 'GET/POST /agents — AI Agent Suite'] },
+        { title: 'Background Tasks', items: ['Image moderation — Gemini scans on upload', 'Video moderation — Async stream analysis', 'File quarantine — Moves flagged media to secure bucket', 'Post indexing — Embeds new posts to pgvector'] },
+        { title: 'Content Moderation States', items: ['approved — Visible to all silo members', 'pending — Under analysis, visible only to author', 'quarantined — Flagged, hidden, file moved to private bucket'] },
+      ],
+    },
+  },
+  websocket: {
+    id: 'websocket', label: 'WebSocket Server', subtitle: 'Real-time Chat · ConnectionManager',
+    icon: <Zap size={22} />, gradient: 'from-orange-500 to-amber-600', glow: 'shadow-orange-500/50', ring: 'ring-orange-400',
+    connects: ['database'],
+    detail: {
+      description: 'Handles real-time bidirectional messaging for both Silo group chats and direct messages. A single in-memory ConnectionManager maps room IDs to live WebSocket connections.',
+      sections: [
+        { title: 'Endpoint', items: ['WS /chat/ws/{room_id}?token={jwt}', 'Token verified against Supabase Auth on connect', 'Message persisted to DB, then broadcast to all room members'] },
+        { title: 'Room ID Convention', items: ['Silo Chat: {silo_uuid} — the group UUID directly', 'Direct Message: dm_{sorted_id_1}_{sorted_id_2} — alphabetically sorted for determinism'] },
+        { title: 'REST Companions', items: ['GET /chat/inbox — Smart inbox with unread counts', 'GET /chat/{room_id}/messages — Full history', 'POST /chat/{room_id}/read — Mark all as read', 'GET /chat/search?q= — Unified user + silo search'] },
+      ],
+    },
+  },
+  agents: {
+    id: 'agents', label: 'AI Agent Suite', subtitle: 'Gemini 2.5 Flash · pgvector RAG',
+    icon: <Bot size={22} />, gradient: 'from-pink-600 to-rose-700', glow: 'shadow-pink-500/50', ring: 'ring-pink-400',
+    connects: ['briefing', 'facilitator', 'concierge', 'database'],
+    badge: 'NEW',
+    detail: {
+      description: 'Three autonomous AI agents powered by Gemini 2.5 Flash. They read, curate, and actively participate in your family network — from morning briefings to reigniting dormant conversations.',
+      sections: [
+        { title: 'Shared Utility (ai_agent.py)', items: ['embed_text() — 768-dim embeddings via text-embedding-004', 'stream_text() — Async SSE generator for Gemini output', 'Shared Supabase + genai client instances'] },
+        { title: 'API Endpoints', items: ['GET /agents/briefing — Personalized daily digest', 'POST /agents/facilitator/check/{silo_id} — Dormancy check + post generation', 'GET /agents/concierge/stream?q= — SSE RAG chat stream', 'POST /agents/index/{silo_id} — Index all posts into pgvector'] },
+        { title: 'Database Tables', items: ['post_embeddings — vector(768) with silo_id FK', 'daily_briefings — Cached summaries per user per day', 'facilitator_runs — Idempotency log (once per silo per day)'] },
+      ],
+    },
+  },
+  briefing: {
+    id: 'briefing', label: 'Daily Briefing', subtitle: 'Story-style · Once per day',
+    icon: <Newspaper size={22} />, gradient: 'from-sky-500 to-cyan-600', glow: 'shadow-sky-500/50', ring: 'ring-sky-400',
+    connects: [],
+    badge: 'NEW',
+    detail: {
+      description: 'An Instagram Story-style modal that greets users each morning with a warm 2-sentence AI summary of unseen family activity. Auto-dismisses after 9 seconds with a progress bar.',
+      sections: [
+        { title: 'Frontend (DailyBriefingModal.tsx)', items: ['Auto-shows on first page load of the day', 'localStorage (famsilo_briefing_shown) prevents repeat auto-shows', 'Sidebar "Today\'s Briefing" button always re-opens it', 'Custom event: window.dispatchEvent(new Event("open-briefing"))', 'Mounted globally in Providers.tsx — available on every page'] },
+        { title: 'Backend Logic', items: ['GET /agents/briefing fetches past 24h posts across all silos', 'Summarized by Gemini into a warm, human tone', 'Cached in daily_briefings table — re-requests are instant', 'useDailyBriefing hook always fetches; localStorage only gates auto-show'] },
+      ],
+    },
+  },
+  facilitator: {
+    id: 'facilitator', label: 'Silo Facilitator', subtitle: 'Dormancy detection · Auto-post',
+    icon: <Users size={22} />, gradient: 'from-lime-600 to-green-700', glow: 'shadow-lime-500/50', ring: 'ring-lime-400',
+    connects: [],
+    badge: 'NEW',
+    detail: {
+      description: 'When a family Silo goes quiet for 24 hours, the Facilitator automatically generates and posts a contextually appropriate piece of content — a joke, trivia, a challenge, or a proposal — to reignite engagement.',
+      sections: [
+        { title: 'Trigger Flow', items: ['SiloFeed.tsx pings POST /agents/facilitator/check/{silo_id} on load', 'Backend checks: last post timestamp < 24 hours ago?', 'Checks facilitator_runs to ensure idempotency (once per silo per day)', 'If dormant: Gemini generates content based on silo name + history', 'Post inserted with is_ai_generated=true flag'] },
+        { title: 'Content Types', items: ['Family trivia or nostalgic question', 'A joke tailored to the group name', 'A "challenge" or activity proposal', 'A heartfelt open-ended question'] },
+      ],
+    },
+  },
+  concierge: {
+    id: 'concierge', label: 'AI Concierge', subtitle: 'RAG Chat · SSE Streaming',
+    icon: <MessageSquare size={22} />, gradient: 'from-fuchsia-600 to-purple-700', glow: 'shadow-fuchsia-500/50', ring: 'ring-fuchsia-400',
+    connects: [],
+    badge: 'NEW',
+    detail: {
+      description: 'A context-aware AI chatbot that intimately knows your family\'s post history. Answers questions grounded in actual silo content via a pgvector RAG pipeline, streamed token-by-token.',
+      sections: [
+        { title: 'RAG Pipeline', items: ['Posts indexed as 768-dim vectors in post_embeddings table', 'User query embedded with text-embedding-004', 'match_silo_posts() Supabase RPC: cosine similarity search', 'Top 5 results injected as context into Gemini prompt', 'Answer streamed via Server-Sent Events (SSE)'] },
+        { title: 'Frontend (ConciergeChatPanel.tsx)', items: ['Opened via ✨ button in TopNavbar or navbar entry', 'Custom event: window.dispatchEvent(new Event("open-concierge"))', 'Uses ReadableStream (not EventSource) to support Bearer JWT header', 'Mutually exclusive with regular chat panel in GlobalChatWrapper'] },
+      ],
+    },
+  },
+  database: {
+    id: 'database', label: 'PostgreSQL / pgvector', subtitle: 'Supabase · RLS · Embeddings',
+    icon: <Database size={22} />, gradient: 'from-purple-600 to-indigo-700', glow: 'shadow-purple-500/50', ring: 'ring-purple-400',
+    connects: [],
+    detail: {
+      description: 'Supabase-hosted PostgreSQL with Row Level Security enabled. Extended with pgvector for AI embedding storage. All data access validated server-side via JWT.',
+      sections: [
+        { title: 'Core Tables', items: ['profiles — User accounts, avatars, privacy toggles', 'groups — Silos (family groups)', 'group_members — users ↔ groups + role (admin|member)', 'posts — Content with status: approved|pending|quarantined', 'messages — Unified Silo + DM chat (silo_id nullable)', 'notifications — Bell feed: silo_invite, like, comment, etc.', 'silo_invites — Email invite tokens'] },
+        { title: 'AI Tables (002_ai_agent_tables.sql)', items: ['post_embeddings — vector(768) per post', 'daily_briefings — Cached AI briefing per user per day', 'facilitator_runs — One-per-silo-per-day idempotency log'] },
+        { title: 'Key Features', items: ['Row Level Security on all tables', 'match_silo_posts() RPC for vector cosine similarity search', 'Full-text search on users via ilike + similarity score'] },
+      ],
+    },
+  },
+  storage: {
+    id: 'storage', label: 'Supabase Storage', subtitle: 'Media Buckets · Quarantine',
+    icon: <Shield size={22} />, gradient: 'from-teal-600 to-cyan-700', glow: 'shadow-teal-500/50', ring: 'ring-teal-400',
+    connects: [],
+    detail: {
+      description: 'Manages all user-uploaded media. Files are initially uploaded to a public staging area, then moved to secure buckets based on AI moderation results.',
+      sections: [
+        { title: 'Buckets', items: ['profiles — Avatars and cover photos (public)', 'media — Approved post images and videos', 'media-quarantine — Flagged content (private, admin-only)'] },
+        { title: 'Upload Flow', items: ['1. Client uploads file to Supabase Storage via signed URL', '2. File path stored in posts table with status=pending', '3. BackgroundTask downloads + scans with Gemini', '4. If clean → status=approved, stays in media bucket', '5. If flagged → status=quarantined, file moved to media-quarantine'] },
+      ],
+    },
+  },
+};
+
+// ─── NODE COMPONENT ────────────────────────────────────────────────────────
+
+function ArchNode({ node, selected, onClick, pulse }: { node: NodeInfo; selected: boolean; onClick: () => void; pulse?: boolean }) {
   return (
-    <div id={id} className="flex items-center gap-3 mb-6 scroll-mt-24">
-      <span className="text-3xl">{emoji}</span>
-      <h2 className="text-2xl font-extrabold text-[#191c1e] tracking-tight">{title}</h2>
+    <button
+      onClick={onClick}
+      className={`relative group flex flex-col items-center gap-2 px-4 py-3 rounded-2xl bg-gradient-to-br ${node.gradient} text-white font-bold text-sm transition-all duration-300 cursor-pointer shadow-lg ${node.glow}
+        ${selected ? `scale-105 ring-4 ${node.ring} ring-offset-2 ring-offset-[#0a0e1a] shadow-2xl` : 'hover:scale-105 hover:shadow-xl opacity-90 hover:opacity-100'}
+        ${pulse ? 'animate-pulse' : ''}
+      `}
+      style={{ minWidth: 130 }}
+    >
+      {node.badge && (
+        <span className="absolute -top-2 -right-2 bg-white text-pink-600 text-[9px] font-black px-1.5 py-0.5 rounded-full shadow-md">
+          {node.badge}
+        </span>
+      )}
+      <div className="opacity-90">{node.icon}</div>
+      <div className="text-xs font-extrabold leading-tight text-center">{node.label}</div>
+      <div className="text-[10px] font-medium opacity-70 text-center leading-tight">{node.subtitle}</div>
+    </button>
+  );
+}
+
+// ─── CONNECTION LINE ──────────────────────────────────────────────────────
+
+function Line({ vertical = false, dashed = false }: { vertical?: boolean; dashed?: boolean }) {
+  return (
+    <div className={`relative ${vertical ? 'w-[2px] h-8 mx-auto' : 'h-[2px] w-8 my-auto'} bg-gradient-to-r from-white/10 via-white/30 to-white/10 overflow-hidden rounded-full`}>
+      <div className={`absolute inset-0 bg-white/60 ${vertical ? 'animate-[shimmer_1.5s_ease-in-out_infinite]' : 'animate-[shimmer_1.5s_ease-in-out_infinite]'}`} />
     </div>
   );
 }
 
-function SubTitle({ children }: { children: React.ReactNode }) {
-  return <h3 className="text-base font-extrabold text-[#0434c6] uppercase tracking-widest mb-3 mt-8">{children}</h3>;
-}
+// ─── DETAIL PANEL ─────────────────────────────────────────────────────────
 
-function Card({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+function DetailPanel({ node, onClose }: { node: NodeInfo; onClose: () => void }) {
   return (
-    <div className={`bg-white rounded-2xl border border-[#e8ecf1] shadow-sm p-6 mb-6 ${className}`}>
-      {children}
-    </div>
-  );
-}
+    <div className="animate-[slide-up-fade_0.35s_cubic-bezier(0.16,1,0.3,1)_both] flex flex-col h-full overflow-y-auto">
+      <div className="flex items-start justify-between mb-5">
+        <div className={`flex items-center gap-3 p-3 rounded-2xl bg-gradient-to-br ${node.gradient} text-white shadow-lg ${node.glow}`}>
+          {node.icon}
+          <div>
+            <div className="font-extrabold text-sm">{node.label}</div>
+            <div className="text-[10px] opacity-70">{node.subtitle}</div>
+          </div>
+        </div>
+        <button onClick={onClose} className="p-2 rounded-xl hover:bg-white/10 text-white/50 hover:text-white transition-colors">
+          <X size={18} />
+        </button>
+      </div>
 
-function Badge({ color, children }: { color: string; children: React.ReactNode }) {
-  const colors: Record<string, string> = {
-    blue:   'bg-blue-50 text-blue-700 border-blue-200',
-    green:  'bg-green-50 text-green-700 border-green-200',
-    purple: 'bg-purple-50 text-purple-700 border-purple-200',
-    orange: 'bg-orange-50 text-orange-700 border-orange-200',
-    red:    'bg-red-50 text-red-700 border-red-200',
-    gray:   'bg-gray-50 text-gray-700 border-gray-200',
-  };
-  return (
-    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold border ${colors[color] || colors.gray}`}>
-      {children}
-    </span>
-  );
-}
+      <p className="text-white/70 text-sm leading-relaxed mb-6 border-l-2 border-white/20 pl-4">{node.detail.description}</p>
 
-function Method({ type }: { type: string }) {
-  const c: Record<string, string> = {
-    GET:     'bg-blue-100 text-blue-800',
-    POST:    'bg-green-100 text-green-800',
-    PUT:     'bg-orange-100 text-orange-800',
-    PATCH:   'bg-purple-100 text-purple-800',
-    DELETE:  'bg-red-100 text-red-800',
-    WS:      'bg-yellow-100 text-yellow-800',
-  };
-  return (
-    <span className={`font-mono text-xs font-extrabold px-2 py-0.5 rounded ${c[type] || 'bg-gray-100 text-gray-800'}`}>
-      {type}
-    </span>
-  );
-}
-
-function Table({ headers, rows }: { headers: string[]; rows: (string | React.ReactNode)[][] }) {
-  return (
-    <div className="overflow-x-auto rounded-xl border border-[#e8ecf1]">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="bg-[#f7f9fb] border-b border-[#e8ecf1]">
-            {headers.map((h) => (
-              <th key={h} className="text-left px-4 py-3 font-extrabold text-[#464555] text-xs uppercase tracking-wider whitespace-nowrap">{h}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, i) => (
-            <tr key={i} className="border-b border-[#f2f4f6] hover:bg-[#fafbfc] transition-colors">
-              {row.map((cell, j) => (
-                <td key={j} className="px-4 py-3 text-[#464555] font-medium align-top">{cell}</td>
+      <div className="space-y-5 flex-1">
+        {node.detail.sections.map((section) => (
+          <div key={section.title}>
+            <div className="text-[10px] font-extrabold text-white/40 uppercase tracking-widest mb-2">{section.title}</div>
+            <div className="space-y-1.5">
+              {section.items.map((item, i) => (
+                <div key={i} className="flex items-start gap-2 text-sm text-white/80 group/item hover:text-white transition-colors">
+                  <ArrowRight size={12} className="flex-shrink-0 mt-1 text-white/30 group-hover/item:text-white/60 transition-colors" />
+                  <span className="leading-snug font-mono text-[11px] text-white/70 hover:text-white">{item}</span>
+                </div>
               ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function Code({ children }: { children: string }) {
-  return <code className="font-mono text-[#0434c6] bg-blue-50 px-1.5 py-0.5 rounded text-xs">{children}</code>;
-}
-
-function Alert({ type, children }: { type: 'warning' | 'tip' | 'note'; children: React.ReactNode }) {
-  const styles = {
-    warning: { bg: 'bg-red-50 border-red-300',   icon: '⚠️', label: 'Warning', text: 'text-red-800' },
-    tip:     { bg: 'bg-green-50 border-green-300', icon: '💡', label: 'Tip',     text: 'text-green-800' },
-    note:    { bg: 'bg-blue-50 border-blue-300',   icon: 'ℹ️', label: 'Note',    text: 'text-blue-800' },
-  };
-  const s = styles[type];
-  return (
-    <div className={`border-l-4 rounded-r-xl p-4 mb-4 ${s.bg}`}>
-      <div className={`font-extrabold text-sm mb-1 ${s.text}`}>{s.icon} {s.label}</div>
-      <div className={`text-sm ${s.text}`}>{children}</div>
-    </div>
-  );
-}
-
-function FlowStep({ step, title, description, color = 'blue' }: { step: number; title: string; description: string; color?: string }) {
-  const colors: Record<string, string> = {
-    blue:   'bg-blue-600',
-    green:  'bg-green-600',
-    purple: 'bg-purple-600',
-    orange: 'bg-orange-500',
-  };
-  return (
-    <div className="flex gap-4 items-start">
-      <div className={`w-8 h-8 rounded-full ${colors[color] || colors.blue} text-white flex items-center justify-center font-extrabold text-sm flex-shrink-0 mt-0.5`}>{step}</div>
-      <div>
-        <div className="font-extrabold text-[#191c1e] text-sm">{title}</div>
-        <div className="text-[#777587] text-sm mt-0.5">{description}</div>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
 }
 
-function FlowConnector() {
-  return <div className="ml-4 pl-0 w-px h-5 bg-[#e0e3e5] ml-[15px]" />;
-}
-
-// ────────────────────────────────────────────────
-// MAIN PAGE
-// ────────────────────────────────────────────────
+// ─── MAIN PAGE ─────────────────────────────────────────────────────────────
 
 export default function DocsPage() {
-  const [activeNav, setActiveNav] = useState('overview');
+  const [selected, setSelected] = useState<NodeId | null>(null);
 
-  const scrollTo = (id: string) => {
-    setActiveNav(id);
-    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  };
+  const select = (id: NodeId) => setSelected(prev => prev === id ? null : id);
+  const selectedNode = selected ? NODES[selected] : null;
 
   return (
-    <div className="min-h-screen bg-[#f7f9fb] font-sans" style={{ fontFamily: '"Plus Jakarta Sans", Inter, sans-serif' }}>
-      {/* ── TOP HEADER ───────────────────────────────────────────── */}
-      <div className="bg-gradient-to-br from-[#0434c6] to-[#3050de] text-white px-8 py-12 shadow-xl">
-        <div className="max-w-6xl mx-auto">
-          <div className="flex items-center gap-3 mb-2">
-            <span className="text-3xl">🏠</span>
-            <span className="text-sm font-bold bg-white/20 px-3 py-1 rounded-full">Internal · Developer Reference</span>
+    <div className="min-h-screen bg-[#080c18] text-white" style={{ fontFamily: '"Plus Jakarta Sans", Inter, sans-serif' }}>
+      
+      {/* Header */}
+      <div className="px-8 pt-10 pb-6 max-w-7xl mx-auto">
+        <div className="flex items-center gap-3 mb-2">
+          <span className="text-xs font-bold bg-white/10 px-3 py-1 rounded-full text-white/60 tracking-widest uppercase">Interactive · Architecture Explorer</span>
+        </div>
+        <h1 className="text-4xl font-extrabold tracking-tight bg-gradient-to-r from-white via-blue-200 to-purple-300 bg-clip-text text-transparent">FamSilo System Anatomy</h1>
+        <p className="text-white/40 mt-2 text-sm">Click any node to explore its internals. Connections show data flow between layers.</p>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-8 pb-16 flex gap-6 min-h-[80vh]">
+
+        {/* Architecture Diagram */}
+        <div className="flex-1 min-w-0">
+          <div className="relative flex flex-col items-center gap-0 pt-4">
+
+            {/* Layer 1: Browser */}
+            <ArchNode node={NODES.frontend} selected={selected === 'frontend'} onClick={() => select('frontend')} />
+
+            {/* L1 → L2 connector hub */}
+            <Line vertical />
+            <div className="flex items-center gap-0 w-full justify-center">
+              <div className="flex-1 h-[2px] bg-gradient-to-r from-transparent to-white/20 max-w-[100px] ml-auto" />
+              <div className="w-[2px] h-4 bg-white/20" />
+              <div className="flex-1 h-[2px] bg-gradient-to-l from-transparent to-white/20 max-w-[100px] mr-auto" />
+            </div>
+
+            {/* Layer 2: Auth | Backend | WebSocket */}
+            <div className="flex items-start gap-8 mt-0">
+              <div className="flex flex-col items-center gap-2">
+                <ArchNode node={NODES.auth} selected={selected === 'auth'} onClick={() => select('auth')} />
+              </div>
+
+              <div className="flex flex-col items-center gap-0">
+                <ArchNode node={NODES.backend} selected={selected === 'backend'} onClick={() => select('backend')} />
+                
+                {/* Backend → L3 connectors */}
+                <Line vertical />
+                <div className="flex items-center w-[460px] justify-center">
+                  <div className="flex-1 h-[2px] bg-white/20" />
+                  <div className="w-[2px] h-4 bg-white/20 mx-0" />
+                  <div className="flex-1 h-[2px] bg-white/20" />
+                </div>
+
+                {/* Layer 3: Agents | Database | Storage */}
+                <div className="flex items-start gap-6 mt-0">
+                  
+                  <div className="flex flex-col items-center gap-0">
+                    <ArchNode node={NODES.agents} selected={selected === 'agents'} onClick={() => select('agents')} />
+                    
+                    {/* Agents → Sub-agents */}
+                    <Line vertical />
+                    <div className="flex items-center w-[360px] justify-center">
+                      <div className="flex-1 h-[2px] bg-white/15" />
+                      <div className="w-[2px] h-4 bg-white/15" />
+                      <div className="flex-1 h-[2px] bg-white/15" />
+                    </div>
+
+                    {/* Layer 4: Sub-agents */}
+                    <div className="flex items-start gap-4 mt-0">
+                      <ArchNode node={NODES.briefing} selected={selected === 'briefing'} onClick={() => select('briefing')} />
+                      <ArchNode node={NODES.facilitator} selected={selected === 'facilitator'} onClick={() => select('facilitator')} />
+                      <ArchNode node={NODES.concierge} selected={selected === 'concierge'} onClick={() => select('concierge')} />
+                    </div>
+                  </div>
+
+                  <ArchNode node={NODES.database} selected={selected === 'database'} onClick={() => select('database')} />
+                  <ArchNode node={NODES.storage} selected={selected === 'storage'} onClick={() => select('storage')} />
+                </div>
+              </div>
+
+              <div className="flex flex-col items-center gap-2">
+                <ArchNode node={NODES.websocket} selected={selected === 'websocket'} onClick={() => select('websocket')} />
+              </div>
+            </div>
+
+            {/* Legend */}
+            <div className="mt-14 flex flex-wrap gap-4 justify-center">
+              {[
+                { color: 'bg-white/20', label: 'Data / REST flow' },
+                { color: 'bg-pink-500/60', label: 'AI Agent layer' },
+                { color: 'bg-emerald-500/60', label: 'Backend processing' },
+              ].map(l => (
+                <div key={l.label} className="flex items-center gap-2 text-xs text-white/40">
+                  <div className={`w-4 h-[2px] rounded-full ${l.color}`} />
+                  {l.label}
+                </div>
+              ))}
+              <div className="text-xs text-white/30 ml-4">← Click any node to explore</div>
+            </div>
           </div>
-          <h1 className="text-4xl font-extrabold tracking-tight mb-3">FamSilo Architecture Docs</h1>
-          <p className="text-blue-100 text-lg max-w-2xl">
-            Single-source developer reference — pages, components, API endpoints, database tables, and feature flows. Open this before touching any feature.
-          </p>
-          <div className="flex flex-wrap gap-3 mt-6">
-            <Badge color="blue">Next.js 16</Badge>
-            <Badge color="green">FastAPI</Badge>
-            <Badge color="purple">Supabase</Badge>
-            <Badge color="orange">WebSocket</Badge>
-            <Badge color="gray">Tailwind CSS</Badge>
-          </div>
+        </div>
+
+        {/* Detail Panel */}
+        <div className={`transition-all duration-500 ease-out overflow-hidden ${selectedNode ? 'w-[380px] opacity-100' : 'w-0 opacity-0'}`}>
+          {selectedNode && (
+            <div className="w-[380px] h-full bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-6 shadow-2xl">
+              <DetailPanel node={selectedNode} onClose={() => setSelected(null)} />
+            </div>
+          )}
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto flex gap-8 px-8 py-10">
-        {/* ── SIDEBAR NAV ──────────────────────────────────────────── */}
-        <aside className="hidden lg:flex flex-col gap-1 w-56 flex-shrink-0 sticky top-8 self-start">
-          <div className="text-xs font-extrabold text-[#b5b3c3] uppercase tracking-widest mb-3 ml-3">Sections</div>
-          {NAV_SECTIONS.map((s) => (
-            <button
-              key={s.id}
-              onClick={() => scrollTo(s.id)}
-              className={`text-left text-sm px-3 py-2.5 rounded-xl font-semibold transition-all ${
-                activeNav === s.id
-                  ? 'bg-[#0434c6] text-white shadow-md'
-                  : 'text-[#464555] hover:bg-white hover:shadow-sm'
-              }`}
-            >
-              {s.label}
-            </button>
-          ))}
-        </aside>
-
-        {/* ── MAIN CONTENT ─────────────────────────────────────────── */}
-        <main className="flex-1 min-w-0 space-y-16">
-
-          {/* ═══════ 1. SYSTEM OVERVIEW ═══════ */}
-          <section>
-            <SectionTitle id="overview" emoji="📐" title="System Overview" />
-
-            <Card>
-              <SubTitle>Stack at a Glance</SubTitle>
-              <Table
-                headers={['Layer', 'Technology', 'Entry Point']}
-                rows={[
-                  ['Frontend',        'Next.js 16 (App Router) + Tailwind CSS',              <Code>app/layout.tsx</Code>],
-                  ['API Client',      'Axios with JWT interceptor',                           <Code>lib/axios.ts</Code>],
-                  ['Backend',         'FastAPI + Python + Uvicorn',                          <Code>main.py</Code>],
-                  ['Database',        'Supabase (PostgreSQL)',                                'Supabase Dashboard'],
-                  ['Authentication',  'Supabase Auth (JWT Bearer)',                           'localStorage → family_app_token'],
-                  ['File Storage',    'Supabase Storage',                                    'bucket: profiles'],
-                  ['Real-time Chat',  'WebSocket via FastAPI ConnectionManager',              <Code>app/routers/chat.py</Code>],
-                ]}
-              />
-            </Card>
-
-            <Card>
-              <SubTitle>Architecture Diagram</SubTitle>
-              <div className="overflow-x-auto">
-                <div className="flex flex-col gap-4 items-center py-4 min-w-[400px]">
-                  <div className="bg-[#0434c6] text-white px-6 py-3 rounded-2xl font-bold text-sm shadow-lg w-64 text-center">
-                    🌐 Browser / Next.js 16
-                    <div className="text-blue-200 text-xs font-normal mt-1">App Router · Tailwind CSS</div>
-                  </div>
-                  <div className="flex gap-6 items-start relative">
-                    <div className="flex flex-col items-center gap-2">
-                      <div className="text-xs text-[#777587] font-bold">REST (Bearer JWT)</div>
-                      <div className="w-px h-8 bg-[#0434c6]" />
-                    </div>
-                    <div className="flex flex-col items-center gap-2">
-                      <div className="text-xs text-[#777587] font-bold">WebSocket (token in URL)</div>
-                      <div className="w-px h-8 bg-orange-400" />
-                    </div>
-                  </div>
-                  <div className="flex gap-6">
-                    <div className="bg-green-600 text-white px-5 py-3 rounded-2xl font-bold text-sm shadow-lg text-center w-52">
-                      ⚙️ FastAPI Backend
-                      <div className="text-green-200 text-xs font-normal mt-1">Python · Uvicorn</div>
-                    </div>
-                    <div className="bg-orange-500 text-white px-5 py-3 rounded-2xl font-bold text-sm shadow-lg text-center w-52">
-                      ⚡ WS ConnectionManager
-                      <div className="text-orange-200 text-xs font-normal mt-1">room_id → list of sockets</div>
-                    </div>
-                  </div>
-                  <div className="w-px h-8 bg-purple-500" />
-                  <div className="bg-purple-700 text-white px-6 py-3 rounded-2xl font-bold text-sm shadow-lg w-64 text-center">
-                    🗄️ Supabase
-                    <div className="text-purple-200 text-xs font-normal mt-1">PostgreSQL · Auth · Storage</div>
-                  </div>
-                </div>
-              </div>
-            </Card>
-
-            <Card>
-              <SubTitle>CORS Allowed Origins</SubTitle>
-              <div className="space-y-1">
-                {['http://localhost:3000', 'http://127.0.0.1:3000', 'http://192.168.1.40:3000 (LAN)', 'https://famsilo-webapp.vercel.app'].map((o) => (
-                  <div key={o} className="font-mono text-sm text-[#464555] bg-[#f2f4f6] px-3 py-1.5 rounded-lg">{o}</div>
-                ))}
-              </div>
-              <Alert type="warning">CORS is configured with <code>allow_origins=["*"]</code> — lock this down to specific domains before production.</Alert>
-            </Card>
-          </section>
-
-          {/* ═══════ 2. AUTH FLOW ═══════ */}
-          <section>
-            <SectionTitle id="auth" emoji="🔐" title="Auth Flow" />
-            <Card>
-              <SubTitle>Login (Email OR Username)</SubTitle>
-              <div className="space-y-3">
-                <FlowStep step={1} color="blue"    title="User submits login form" description="Can enter email (e.g. john@email.com) OR username (e.g. john_doe) — no @ detection." />
-                <FlowConnector />
-                <FlowStep step={2} color="blue"    title="Backend translates username → email" description="POST /auth/login looks up the email in profiles table if no '@' in identifier." />
-                <FlowConnector />
-                <FlowStep step={3} color="green"   title="Supabase Auth authenticates" description="sign_in_with_password() validates credentials and returns JWT access_token." />
-                <FlowConnector />
-                <FlowStep step={4} color="purple"  title="Token stored in localStorage" description="Frontend saves token as family_app_token and user_id separately." />
-                <FlowConnector />
-                <FlowStep step={5} color="orange"  title="Every request uses Bearer token" description="lib/axios.ts intercepts all requests and adds Authorization: Bearer <token>." />
-              </div>
-              <Alert type="note">On 401 or 422 responses, the axios interceptor auto-removes the token and redirects to <code>/login</code>.</Alert>
-            </Card>
-
-            <Card>
-              <SubTitle>Signup Rules</SubTitle>
-              <Table
-                headers={['Rule', 'Detail']}
-                rows={[
-                  ['Username format',   'Lowercase, 3-20 chars, only letters/numbers/underscore (regex enforced)'],
-                  ['Username uniqueness', 'Checked against profiles table before Supabase auth creation'],
-                  ['Email verification', 'Supabase may require email verification — session could be null on signup'],
-                  ['Profile creation',  'On signup, a row is immediately inserted into profiles with id, username, email'],
-                ]}
-              />
-            </Card>
-          </section>
-
-          {/* ═══════ 3. PAGES ═══════ */}
-          <section>
-            <SectionTitle id="pages" emoji="📁" title="Pages (App Router)" />
-            <Card>
-              <Table
-                headers={['Route', 'File', 'Key Components', 'API Calls']}
-                rows={[
-                  [<Code>/</Code>,           <Code>app/page.tsx</Code>,               'TopNavbar, Sidebar, GroupProfileFeed, FeedList, GlobalChatWrapper', 'GET /silos/, GET /posts/group/{id}'],
-                  [<Code>/login</Code>,       <Code>app/login/page.tsx</Code>,         '—',                                                  'POST /auth/login, POST /auth/signup'],
-                  [<Code>/profile</Code>,     <Code>app/profile/page.tsx</Code>,       'ProfileHero, ProfileStatsBar, ProfileAbout, EditProfileModal',    'GET /users/me, PUT /users/me'],
-                  [<Code>/silo/[id]</Code>,   <Code>app/silo/[id]/page.tsx</Code>,    'SiloHeader, SiloVaultTab, SiloMembersTab, InviteMemberModal',    'GET /silos/{id} (useSilo hook)'],
-                  [<Code>/join</Code>,        <Code>app/join/page.tsx</Code>,          '—',                                                  'POST /silos/join (email token redemption)'],
-                  [<Code>/docs</Code>,        <Code>app/docs/page.tsx</Code>,          '— (this page)',                                       '—'],
-                ]}
-              />
-            </Card>
-          </section>
-
-          {/* ═══════ 4. COMPONENTS ═══════ */}
-          <section>
-            <SectionTitle id="components" emoji="🧩" title="Components" />
-
-            <SubTitle>Global Layout</SubTitle>
-            <Card>
-              <Table
-                headers={['Component', 'File', 'Responsibility']}
-                rows={[
-                  ['Providers',         <Code>components/Providers.tsx</Code>,              'Wraps app in ChatContext provider'],
-                  ['TopNavbar',         <Code>components/TopNavbar.tsx</Code>,              'Logo, NotificationBell, GlobalChatButton, avatar → /profile'],
-                  ['Sidebar',           <Code>components/Sidebar.tsx</Code>,                'Silo list, CreateGroupModal trigger'],
-                  ['NotificationBell',  <Code>components/NotificationBell.tsx</Code>,       'Bell icon, notification dropdown, Accept/Decline for silo invites'],
-                ]}
-              />
-            </Card>
-
-            <SubTitle>Home Feed</SubTitle>
-            <Card>
-              <Table
-                headers={['Component', 'File', 'Responsibility']}
-                rows={[
-                  ['GroupProfileFeed',  <Code>components/GroupProfileFeed.tsx</Code>,  'Tab switcher: Silos vs Members'],
-                  ['FeedList',          <Code>components/FeedList.tsx</Code>,          'Renders FeedCards for a silo'],
-                  ['FeedCard',          <Code>components/FeedCard.tsx</Code>,          'Single post: image, caption, author'],
-                  ['SecureImage',       <Code>components/SecureImage.tsx</Code>,       'Fetches private Storage images with auth header'],
-                  ['UploadModal',       <Code>components/UploadModal.tsx</Code>,       'Multi-step photo upload → POST /posts/'],
-                  ['CreateGroupModal',  <Code>components/CreateGroupModal.tsx</Code>,  'Create new Silo → POST /silos/'],
-                ]}
-              />
-            </Card>
-
-            <SubTitle>Silo Dashboard</SubTitle>
-            <Card>
-              <Table
-                headers={['Component', 'File', 'Responsibility']}
-                rows={[
-                  ['SiloHeader',         <Code>components/silo/SiloHeader.tsx</Code>,         'Name, description, tabs (Vault/Members/Feed/Calendar), Invite button'],
-                  ['SiloVaultTab',       <Code>components/silo/SiloVaultTab.tsx</Code>,       'Photo grid, opens UploadModal'],
-                  ['SiloMembersTab',     <Code>components/silo/SiloMembersTab.tsx</Code>,     'Member list, click opens ViewProfileModal'],
-                  ['SiloPlaceholderTab', <Code>components/silo/SiloPlaceholderTab.tsx</Code>, 'Coming Soon placeholder for Feed and Calendar tabs'],
-                  ['InviteMemberModal',  <Code>components/InviteMemberModal.tsx</Code>,       'Real-time user search (300ms debounce), POST /silos/{id}/invite, email fallback'],
-                  ['ViewProfileModal',   <Code>components/ViewProfileModal.tsx</Code>,        'Read-only public profile card → GET /users/{userId}'],
-                ]}
-              />
-            </Card>
-
-            <SubTitle>Profile Page</SubTitle>
-            <Card>
-              <Table
-                headers={['Component', 'File', 'Responsibility']}
-                rows={[
-                  ['ProfileHero',        <Code>components/profile/ProfileHero.tsx</Code>,        'Cover photo, avatar, display name'],
-                  ['ProfileStatsBar',    <Code>components/profile/ProfileStatsBar.tsx</Code>,    'Stats: Silos joined, members known, posts. Shows Silos + Network lists'],
-                  ['ProfileAbout',       <Code>components/profile/ProfileAbout.tsx</Code>,       'Bio, location, DOB, hobbies'],
-                  ['ProfileMemories',    <Code>components/profile/ProfileMemories.tsx</Code>,    'Photo feed for the user'],
-                  ['EditProfileModal',   <Code>components/profile/EditProfileModal.tsx</Code>,   'Full edit form + base64 image upload, 7-day username rule'],
-                  ['ImageCropModal',     <Code>components/profile/ImageCropModal.tsx</Code>,     'Canvas crop tool before avatar/cover upload'],
-                ]}
-              />
-            </Card>
-
-            <SubTitle>Chat System</SubTitle>
-            <Card>
-              <Table
-                headers={['Component', 'File', 'Responsibility']}
-                rows={[
-                  ['GlobalChatWrapper',  <Code>components/chat/GlobalChatWrapper.tsx</Code>,  'Floating panel container, z-index 50'],
-                  ['GlobalChatButton',   <Code>components/chat/GlobalChatButton.tsx</Code>,   'Chat bubble icon in TopNavbar'],
-                  ['ChatInbox',          <Code>components/chat/ChatInbox.tsx</Code>,          'SWR poll /chat/inbox every 15s, real-time search /chat/search'],
-                  ['ChatItem',           <Code>components/chat/ChatItem.tsx</Code>,           'Single inbox row (DM circle / Silo square avatar)'],
-                  ['ChatWindow',         <Code>components/chat/ChatWindow.tsx</Code>,         'WS connect, load history, send/receive messages, mark read'],
-                  ['ChatMessage',        <Code>components/chat/ChatMessage.tsx</Code>,        'Single message bubble'],
-                  ['SiloChatPanel',      <Code>components/chat/SiloChatPanel.tsx</Code>,      'Inline Silo chat tab inside silo dashboard'],
-                  ['AvatarStack',        <Code>components/chat/AvatarStack.tsx</Code>,        'Stacked avatars (used in group room previews)'],
-                ]}
-              />
-              <div className="mt-4 p-4 bg-[#f7f9fb] rounded-xl">
-                <div className="font-extrabold text-sm text-[#191c1e] mb-2">Room ID Convention</div>
-                <div className="space-y-2">
-                  <div className="flex items-center gap-3">
-                    <Badge color="blue">Silo Chat</Badge>
-                    <Code>{'{silo_uuid}'}</Code>
-                    <span className="text-[#777587] text-xs">— the group UUID directly</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Badge color="green">Direct Message</Badge>
-                    <Code>{'dm_{sorted_id_1}_{sorted_id_2}'}</Code>
-                    <span className="text-[#777587] text-xs">— IDs sorted alphabetically (deterministic)</span>
-                  </div>
-                </div>
-              </div>
-            </Card>
-          </section>
-
-          {/* ═══════ 5. API REFERENCE ═══════ */}
-          <section>
-            <SectionTitle id="api" emoji="⚙️" title="API Reference" />
-
-            <SubTitle>Auth · /auth</SubTitle>
-            <Card>
-              <Table
-                headers={['Method', 'Path', 'Description']}
-                rows={[
-                  [<Method type="POST" />, '/auth/signup', 'Register: creates Supabase auth user + inserts profiles row immediately'],
-                  [<Method type="POST" />, '/auth/login',  'Login via email OR username. Returns JWT access_token + user_id'],
-                ]}
-              />
-            </Card>
-
-            <SubTitle>Users · /users</SubTitle>
-            <Card>
-              <Table
-                headers={['Method', 'Path', 'Description']}
-                rows={[
-                  [<Method type="GET" />,   '/users/me',              'Full profile + stats (silos count, members count) + silos_list + members_list'],
-                  [<Method type="PUT" />,   '/users/me',              'Update profile. Accepts base64 images. Enforces 7-day username change rule'],
-                  [<Method type="POST" />,  '/users/me/image',        'Upload avatar or cover photo. Deletes old file from Storage first'],
-                  [<Method type="GET" />,   '/users/search?q=',       'Real-time user search. Results sorted by relevance score (exact > prefix > word-start > contains)'],
-                  [<Method type="GET" />,   '/users/{user_id}',       'Public profile. Respects privacy toggles (show_location, show_dob, show_hobbies)'],
-                ]}
-              />
-            </Card>
-
-            <SubTitle>Silos · /silos</SubTitle>
-            <Card>
-              <Table
-                headers={['Method', 'Path', 'Description']}
-                rows={[
-                  [<Method type="POST" />, '/silos/',                     'Create silo. Auto-adds creator as admin in group_members'],
-                  [<Method type="GET" />,  '/silos/',                     'List all silos current user is a member of'],
-                  [<Method type="GET" />,  '/silos/{id}',                 'Full silo detail: name, description, all members with avatars/roles'],
-                  [<Method type="POST" />, '/silos/{id}/invites',         'EMAIL invite: generates token, sends Gmail SMTP email with magic link'],
-                  [<Method type="POST" />, '/silos/join',                 'Redeem email invite token from /join?token= page'],
-                  [<Method type="POST" />, '/silos/{id}/invite',          'IN-APP invite: creates silo_invite notification for target user'],
-                  [<Method type="POST" />, '/silos/{id}/accept-invite',   'Accept in-app invite: inserts group_members, marks notification read'],
-                  [<Method type="POST" />, '/silos/{id}/decline-invite',  'Decline in-app invite: marks notification read/dismissed'],
-                ]}
-              />
-              <Alert type="note">
-                The email invite (<code>/invites</code>) requires <code>role = admin</code>. The in-app invite (<code>/invite</code>) currently does NOT check admin role — any member can invite.
-              </Alert>
-            </Card>
-
-            <SubTitle>Posts · /posts</SubTitle>
-            <Card>
-              <Table
-                headers={['Method', 'Path', 'Description']}
-                rows={[
-                  [<Method type="POST" />, '/posts/',                  'Create post. Verifies user is a silo member first'],
-                  [<Method type="GET" />,  '/posts/group/{group_id}',  'Get silo feed, ordered newest first. Joins author profile for username + avatar'],
-                ]}
-              />
-            </Card>
-
-            <SubTitle>Chat · /chat</SubTitle>
-            <Card>
-              <Table
-                headers={['Method', 'Path', 'Description']}
-                rows={[
-                  [<Method type="WS" />,   '/chat/ws/{room_id}?token=',    'Real-time WebSocket. Authenticates token, persists messages, broadcasts to room'],
-                  [<Method type="GET" />,  '/chat/inbox',                   'Smart inbox: Silos + DMs, latest message preview, unread count, sorted by time'],
-                  [<Method type="GET" />,  '/chat/search?q=',               'Unified search: users (DM rooms) + silos, relevance sorted'],
-                  [<Method type="GET" />,  '/chat/{room_id}/messages',       'Full message history for a room. DM = starts with dm_, Silo = UUID'],
-                  [<Method type="GET" />,  '/chat/dms',                     'List all users you have an active DM history with'],
-                  [<Method type="POST" />, '/chat/{room_id}/read',           'Mark all unread DMs in room as read'],
-                ]}
-              />
-            </Card>
-
-            <SubTitle>Notifications · /notifications</SubTitle>
-            <Card>
-              <Table
-                headers={['Method', 'Path', 'Description']}
-                rows={[
-                  [<Method type="GET" />,   '/notifications/',              'Fetch all notifications + unread_count for the badge'],
-                  [<Method type="PATCH" />, '/notifications/read-all',      'Mark all as read'],
-                  [<Method type="PATCH" />, '/notifications/{id}/read',     'Mark one notification as read'],
-                ]}
-              />
-              <Alert type="warning">The notifications endpoint returns raw actor_id but does NOT enrich it with profile name/avatar. The UI's actor_name will be undefined until a bulk profile lookup is added in notifications.py.</Alert>
-            </Card>
-          </section>
-
-          {/* ═══════ 6. DATABASE ═══════ */}
-          <section>
-            <SectionTitle id="database" emoji="🗄️" title="Database" />
-
-            <Card>
-              <SubTitle>Tables Overview</SubTitle>
-              <Table
-                headers={['Table', 'Primary Key', 'Purpose', 'Key Columns']}
-                rows={[
-                  ['profiles',      'uuid id',  'User accounts and public/private profile data',           'username, email, avatar_url, cover_photo_url, show_* toggles, last_username_change'],
-                  ['groups',        'uuid id',  'Silos (family groups)',                                   'name, description, created_by'],
-                  ['group_members', 'uuid id',  'Many-to-many: users ↔ groups + role',                    'group_id, user_id, role (admin|member)'],
-                  ['posts',         'uuid id',  'Photo posts inside silos',                                'group_id, author_id, image_path, caption'],
-                  ['messages',      'uuid id',  'Both Silo group chat AND direct messages in one table',   'user_id, silo_id (null for DM), receiver_id (null for Silo), content, is_read'],
-                  ['notifications', 'uuid id',  'All notification types including silo invites',           'user_id, actor_id, type, silo_id, is_read'],
-                  ['silo_invites',  'uuid id',  'Email invite token store',                                'silo_id, email, token, role, invited_by, status (pending|accepted)'],
-                ]}
-              />
-            </Card>
-
-            <SubTitle>Message Routing Logic (Unified Table)</SubTitle>
-            <Card>
-              <Table
-                headers={['Chat Type', 'silo_id', 'receiver_id', 'Room ID Used by Frontend']}
-                rows={[
-                  ['Silo group chat',  'silo UUID',  'NULL',       '{silo_uuid}'],
-                  ['Direct message',   'NULL',        'user UUID',  'dm_{sorted_uuid_1}_{sorted_uuid_2}'],
-                ]}
-              />
-            </Card>
-
-            <SubTitle>Relationships</SubTitle>
-            <Card>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {[
-                  ['profiles', '→', 'group_members', 'A user can be in many silos'],
-                  ['groups',   '→', 'group_members', 'A silo has many members'],
-                  ['groups',   '→', 'posts',         'A silo has many posts'],
-                  ['profiles', '→', 'posts',         'A user authors many posts'],
-                  ['profiles', '→', 'messages',      'A user sends many messages'],
-                  ['groups',   '→', 'messages',      'A silo has group messages'],
-                  ['profiles', '→', 'notifications', 'A user receives many notifications'],
-                  ['groups',   '→', 'silo_invites',  'A silo has pending email invites'],
-                ].map(([from, arrow, to, label]) => (
-                  <div key={`${from}-${to}`} className="flex items-center gap-2 bg-[#f7f9fb] rounded-xl p-3">
-                    <Badge color="purple">{from as string}</Badge>
-                    <span className="text-[#b5b3c3]">{arrow}</span>
-                    <Badge color="blue">{to as string}</Badge>
-                    <span className="text-[#777587] text-xs">{label as string}</span>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          </section>
-
-          {/* ═══════ 7. LIB ═══════ */}
-          <section>
-            <SectionTitle id="lib" emoji="📦" title="Shared Lib Layer" />
-            <Card>
-              <Table
-                headers={['File', 'Purpose']}
-                rows={[
-                  [<Code>lib/axios.ts</Code>,                    'Axios instance: injects Bearer token on every request. Auto-redirects to /login on 401/422'],
-                  [<Code>lib/supabase.ts</Code>,                 'Supabase browser client (for Storage public URL generation)'],
-                  [<Code>lib/cropImage.ts</Code>,                'Canvas-based utility to crop images before upload (used in EditProfileModal)'],
-                  [<Code>lib/keepAlive.ts</Code>,                'Background ping to prevent API cold starts (Supabase free tier hibernation)'],
-                  [<Code>lib/context/ChatContext.tsx</Code>,     'Global openChatWith(roomId, name) function — open any chat room from anywhere in the app'],
-                  [<Code>lib/hooks/useProfile.ts</Code>,         'SWR hook → GET /users/me'],
-                  [<Code>lib/hooks/useSilo.ts</Code>,            'SWR hook → GET /silos/{id}'],
-                  [<Code>lib/hooks/useUser.ts</Code>,            'Reads user_id from localStorage'],
-                  [<Code>lib/hooks/useUnreadMessages.ts</Code>,  'Polls for unread DM count (used for navbar badge)'],
-                ]}
-              />
-            </Card>
-          </section>
-
-          {/* ═══════ 8. FEATURE FLOWS ═══════ */}
-          <section>
-            <SectionTitle id="flows" emoji="🔁" title="Feature Flows" />
-
-            <SubTitle>In-App Invite & Accept Flow</SubTitle>
-            <Card>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div>
-                  <div className="font-extrabold text-sm text-[#191c1e] mb-4">📤 Sending an Invite</div>
-                  <div className="space-y-3">
-                    <FlowStep step={1} color="blue"   title="Admin opens InviteMemberModal" description="Triggered by Invite button in SiloHeader" />
-                    <FlowConnector />
-                    <FlowStep step={2} color="blue"   title="Types username (real-time search)" description="useEffect debounced 300ms → GET /users/search?q=" />
-                    <FlowConnector />
-                    <FlowStep step={3} color="blue"   title="Clicks Invite button" description="POST /silos/{id}/invite with user_id" />
-                    <FlowConnector />
-                    <FlowStep step={4} color="green"  title="Backend checks + creates notification" description="Anti-spam check: no existing pending invite. Then INSERT notifications (silo_invite)" />
-                    <FlowConnector />
-                    <FlowStep step={5} color="green"  title='Success state: "Invite Sent! ✨"' description="Modal closes after 2 seconds" />
-                  </div>
-                </div>
-                <div>
-                  <div className="font-extrabold text-sm text-[#191c1e] mb-4">📥 Accepting an Invite</div>
-                  <div className="space-y-3">
-                    <FlowStep step={1} color="purple" title="Invitee opens NotificationBell" description="GET /notifications/ fetches all notifications" />
-                    <FlowConnector />
-                    <FlowStep step={2} color="purple" title="Sees silo_invite notification" description={'"@X invited you to join Y" with Accept/Decline buttons'} />
-                    <FlowConnector />
-                    <FlowStep step={3} color="purple" title="Clicks Accept" description="POST /silos/{id}/accept-invite with notification_id" />
-                    <FlowConnector />
-                    <FlowStep step={4} color="green"  title="Backend joins group" description="INSERT group_members + UPDATE notification is_read=true" />
-                    <FlowConnector />
-                    <FlowStep step={5} color="green"  title="Instant local state update" description="Notification removed from list immediately — no re-fetch needed" />
-                  </div>
-                </div>
-              </div>
-            </Card>
-
-            <SubTitle>WebSocket Chat Flow</SubTitle>
-            <Card>
-              <div className="space-y-3">
-                <FlowStep step={1} color="blue"   title="ChatWindow opens" description="GET /chat/{room_id}/messages loads history. Rendered as ChatMessage bubbles." />
-                <FlowConnector />
-                <FlowStep step={2} color="blue"   title="WebSocket connects" description="WS URL: /chat/ws/{room_id}?token={jwt}. Backend verifies token via Supabase Auth." />
-                <FlowConnector />
-                <FlowStep step={3} color="orange" title="User sends a message" description="Text sent via WebSocket. Backend determines room type (dm_ prefix vs silo UUID)." />
-                <FlowConnector />
-                <FlowStep step={4} color="green"  title="Backend persists + broadcasts" description="INSERT into messages, then broadcasts payload to ALL connections in that room_id." />
-                <FlowConnector />
-                <FlowStep step={5} color="green"  title="All clients receive message" description="Each ChatWindow receives broadcast and appends to local message list without re-fetch." />
-              </div>
-            </Card>
-          </section>
-
-          {/* ═══════ 8.5. AI MODERATION ═══════ */}
-          <section>
-            <SectionTitle id="moderation" emoji="🛡️" title="AI Moderation Pipeline" />
-
-            <Card>
-              <div className="text-sm text-[#464555] leading-relaxed mb-6">
-                Every piece of user-generated content passes through a <strong>Zero-Trust AI Moderation Pipeline</strong> powered by Google Gemini before becoming public. This prevents PII leaks, harassment, and NSFW content.
-              </div>
-
-              <SubTitle>Moderation Workflows</SubTitle>
-              <Table
-                headers={['Content Type', 'Timing', 'Model', 'Action if Flagged']}
-                rows={[
-                  ['Text Posts & Captions', 'Synchronous',  <Code>gemini-2.5-flash</Code>, '422 Unprocessable Entity thrown instantly. Database write blocked.'],
-                  ['Comments',              'Synchronous',  <Code>gemini-2.5-flash</Code>, '422 Unprocessable Entity thrown instantly. Database write blocked.'],
-                  ['Images (JPEG/PNG)',     'Asynchronous', <Code>gemini-2.5-flash</Code>, 'DB status changed to quarantined. File moved to media-quarantine bucket.'],
-                  ['Videos (MP4/WebM)',     'Asynchronous', <Code>gemini-2.5-flash</Code>, 'DB status changed to quarantined. File moved to media-quarantine bucket.'],
-                ]}
-              />
-
-              <SubTitle>Frontend States</SubTitle>
-              <div className="space-y-4">
-                <div className="flex items-start gap-3">
-                  <Badge color="green">approved</Badge>
-                  <span className="text-sm text-[#464555]">Normal state. Visible in all feeds to all silo members.</span>
-                </div>
-                <div className="flex items-start gap-3">
-                  <Badge color="orange">pending</Badge>
-                  <span className="text-sm text-[#464555]">Currently being analyzed by BackgroundTasks. Visible <strong>only to the author</strong> with a yellow loading banner.</span>
-                </div>
-                <div className="flex items-start gap-3">
-                  <Badge color="red">quarantined</Badge>
-                  <span className="text-sm text-[#464555]">Flagged by AI. Excluded from all feeds. Visible <strong>only to the author</strong> (and admins) with a red shield warning. File moved to private storage.</span>
-                </div>
-              </div>
-            </Card>
-          </section>
-
-          {/* ═══════ 9. KNOWN ISSUES ═══════ */}
-          <section>
-            <SectionTitle id="issues" emoji="⚡" title="Known Issues & Improvements" />
-            <div className="space-y-3">
-              <Alert type="warning">
-                <strong>Bug: Notifications missing actor name.</strong> GET /notifications/ returns actor_id but notifications.py doesn't fetch profile names. The UI tries to render <code>n.actor_name</code> which will be undefined. Fix: add a bulk profile lookup in the router before returning.
-              </Alert>
-              <Alert type="warning">
-                <strong>Bug: mark-room-as-read is too broad.</strong> POST /chat/{'{room_id}'}/read marks ALL unread DMs where receiver = current user, regardless of room. It should filter by sender (peer_id from room_id) too.
-              </Alert>
-              <Alert type="warning">
-                <strong>Permission gap: any member can invite.</strong> POST /silos/{'{id}'}/invite has no admin check. The email route (/invites) does check admin. Decide if non-admins should be able to invite and align both endpoints.
-              </Alert>
-              <Alert type="tip">
-                <strong>Add auto-refresh to NotificationBell.</strong> Currently fetches only on mount. Add <code>setInterval</code> or SWR <code>refreshInterval: 30000</code> so silo invites appear in real time.
-              </Alert>
-              <Alert type="tip">
-                <strong>Reduce chat inbox N+1.</strong> GET /chat/inbox runs a separate DB query per room for the latest message. Move to a single SQL view or Supabase RPC function for better performance at scale.
-              </Alert>
-              <Alert type="tip">
-                <strong>Feed and Calendar tabs are not yet implemented</strong> — they render SiloPlaceholderTab. Good next features to build.
-              </Alert>
-            </div>
-          </section>
-
-          {/* ═══════ 10. FILE INDEX ═══════ */}
-          <section>
-            <SectionTitle id="index" emoji="📂" title="File Quick-Lookup Index" />
-            <Card>
-              <Table
-                headers={['What you want to touch', 'File']}
-                rows={[
-                  ['Login / Signup form',            <Code>app/login/page.tsx</Code>],
-                  ['Home feed page',                 <Code>app/page.tsx</Code>],
-                  ['Silo dashboard',                 <Code>app/silo/[id]/page.tsx</Code>],
-                  ['Email token join page',          <Code>app/join/page.tsx</Code>],
-                  ['Silo invite modal',              <Code>components/InviteMemberModal.tsx</Code>],
-                  ['Notification bell + actions',    <Code>components/NotificationBell.tsx</Code>],
-                  ['User profile page',              <Code>app/profile/page.tsx</Code>],
-                  ['Edit profile form',              <Code>components/profile/EditProfileModal.tsx</Code>],
-                  ['Public profile card',            <Code>components/ViewProfileModal.tsx</Code>],
-                  ['Create silo modal',              <Code>components/CreateGroupModal.tsx</Code>],
-                  ['Left sidebar',                   <Code>components/Sidebar.tsx</Code>],
-                  ['Top navbar',                     <Code>components/TopNavbar.tsx</Code>],
-                  ['Chat inbox panel',               <Code>components/chat/ChatInbox.tsx</Code>],
-                  ['Chat messages window',           <Code>components/chat/ChatWindow.tsx</Code>],
-                  ['Silo inline chat',               <Code>components/chat/SiloChatPanel.tsx</Code>],
-                  ['Photo upload',                   <Code>components/UploadModal.tsx</Code>],
-                  ['Auth endpoints',                 <Code>Family_Group_API/app/routers/auth.py</Code>],
-                  ['User endpoints',                 <Code>Family_Group_API/app/routers/users.py</Code>],
-                  ['Silo + invite endpoints',        <Code>Family_Group_API/app/routers/silos.py</Code>],
-                  ['Chat + WebSocket',               <Code>Family_Group_API/app/routers/chat.py</Code>],
-                  ['Notifications',                  <Code>Family_Group_API/app/routers/notifications.py</Code>],
-                  ['Posts / Feed',                   <Code>Family_Group_API/app/routers/posts.py</Code>],
-                  ['Axios config + auth guard',      <Code>lib/axios.ts</Code>],
-                  ['Global chat state',              <Code>lib/context/ChatContext.tsx</Code>],
-                ]}
-              />
-            </Card>
-          </section>
-
-          {/* ── FOOTER ── */}
-          <div className="text-center py-8 border-t border-[#e8ecf1] text-[#b5b3c3] text-sm">
-            FamSilo Developer Docs · Last updated automatically · Visit <a href="/" className="text-[#0434c6] hover:underline">← Back to App</a>
-          </div>
-
-        </main>
-      </div>
+      {/* Hint when nothing selected */}
+      {!selected && (
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-white/8 backdrop-blur-xl border border-white/10 rounded-full px-5 py-2.5 text-white/50 text-xs font-semibold animate-[slide-up-fade_0.5s_0.5s_both]">
+          <span className="w-2 h-2 rounded-full bg-white/40 animate-pulse" />
+          Select any node in the diagram to inspect it
+        </div>
+      )}
     </div>
   );
 }
