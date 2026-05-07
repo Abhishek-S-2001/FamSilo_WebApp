@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { PlusCircle, ImagePlus, User as UserIcon, Loader2 } from 'lucide-react';
+import { PlusCircle, ImagePlus, User as UserIcon } from 'lucide-react';
 import FeedCard, { Post } from '../FeedCard';
 import CreatePostModal, { NewPostPayload } from './CreatePostModal';
 import api from '@/lib/axios';
@@ -85,7 +85,18 @@ export default function SiloFeed({ siloId }: SiloFeedProps) {
 
   useEffect(() => {
     fetchFeed();
-  }, [fetchFeed]);
+
+    // ── Ping Facilitator (once per day, idempotent) ──
+    // Backend deduplicates via facilitator_runs table; no risk of spamming.
+    api.post(`/agents/facilitator/check/${siloId}`)
+      .then((res) => {
+        if (res.data?.triggered) {
+          // A new AI post was created — refresh the feed to show it
+          setTimeout(() => fetchFeed(), 800);
+        }
+      })
+      .catch(() => { /* non-critical — fail silently */ });
+  }, [fetchFeed, siloId]);
 
   // ── Create Post Handler ──
   const handleCreatePost = async (newPost: NewPostPayload): Promise<void> => {
@@ -142,46 +153,46 @@ export default function SiloFeed({ siloId }: SiloFeedProps) {
       {/* ── Create Post Trigger ── */}
       <div
         onClick={() => setShowCreateModal(true)}
-        className="bg-white rounded-2xl border border-[#f2f4f6] shadow-[0_4px_24px_rgba(25,28,30,0.04)] p-5 flex items-center gap-4 cursor-pointer hover:shadow-[0_8px_30px_rgba(25,28,30,0.07)] transition-shadow group"
+        className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-subtle)] dark:border-[var(--border-default)] shadow-[var(--shadow-card)] dark:shadow-none p-5 flex items-center gap-4 cursor-pointer hover:border-[var(--brand)] transition-all group"
       >
-        <div className="w-11 h-11 rounded-full bg-[#f2f4f6] flex items-center justify-center flex-shrink-0">
-          <UserIcon size={20} className="text-[#777587]" />
+        <div className="w-11 h-11 rounded-full bg-[var(--bg-input)] flex items-center justify-center flex-shrink-0">
+          <UserIcon size={20} className="text-[var(--text-muted)]" />
         </div>
         <div className="flex-1">
-          <p
-            className="text-sm font-medium text-[#b5b3c3] group-hover:text-[#777587] transition-colors"
-            style={{ fontFamily: '"Plus Jakarta Sans", sans-serif' }}
-          >
+          <p className="text-sm font-medium text-[var(--text-faint)] group-hover:text-[var(--text-muted)] transition-colors">
             Share a memory or thought with your silo…
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button className="w-9 h-9 rounded-full bg-[#f7f9fb] flex items-center justify-center text-[#777587] hover:text-[#0434c6] hover:bg-blue-50 transition-colors">
+          <button className="w-9 h-9 rounded-full bg-[var(--bg-input)] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--brand)] hover:bg-[var(--brand-soft)] transition-colors">
             <ImagePlus size={18} />
           </button>
-          <button className="w-9 h-9 rounded-full bg-gradient-to-br from-[#0434c6] to-[#3050de] flex items-center justify-center text-white shadow-md hover:scale-105 transition-transform">
+          <button className="w-9 h-9 rounded-full bg-gradient-to-br from-[var(--brand)] to-[var(--brand-medium)] flex items-center justify-center text-white shadow-md hover:scale-105 transition-transform">
             <PlusCircle size={18} />
           </button>
         </div>
       </div>
 
-      {/* ── Loading ── */}
       {isLoading && (
-        <div className="flex justify-center py-12">
-          <Loader2 size={28} className="animate-spin text-[#0434c6]" />
+        <div className="flex flex-col gap-8">
+          {[1,2].map(i => (
+            <div key={i} className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-subtle)] dark:border-[var(--border-default)] p-5 flex flex-col gap-4">
+              <div className="flex items-center gap-3"><div className="skeleton w-10 h-10 rounded-full" /><div className="flex flex-col gap-1.5"><div className="skeleton h-3.5 w-28 rounded" /><div className="skeleton h-2.5 w-16 rounded" /></div></div>
+              <div className="skeleton w-full aspect-[4/3] rounded-xl" />
+              <div className="flex gap-3"><div className="skeleton h-8 w-14 rounded-xl" /><div className="skeleton h-8 w-14 rounded-xl" /></div>
+            </div>
+          ))}
         </div>
       )}
 
       {/* ── Empty State ── */}
       {!isLoading && posts.length === 0 && (
         <div className="flex flex-col items-center justify-center py-16 text-center gap-3">
-          <div className="w-16 h-16 bg-[#f2f4f6] rounded-2xl flex items-center justify-center mb-2">
-            <ImagePlus size={28} className="text-[#b5b3c3]" />
+          <div className="w-16 h-16 bg-[var(--bg-input)] rounded-2xl flex items-center justify-center mb-2">
+            <ImagePlus size={28} className="text-[var(--text-faint)]" />
           </div>
-          <p className="text-lg font-extrabold text-[#191c1e]" style={{ fontFamily: '"Plus Jakarta Sans", sans-serif' }}>
-            No posts yet
-          </p>
-          <p className="text-sm text-[#777587] font-medium max-w-xs">
+          <p className="text-lg font-extrabold text-[var(--text-primary)]">No posts yet</p>
+          <p className="text-sm text-[var(--text-muted)] font-medium max-w-xs">
             Be the first to share a memory with your silo — photos, thoughts, or proposals!
           </p>
         </div>
@@ -194,13 +205,13 @@ export default function SiloFeed({ siloId }: SiloFeedProps) {
 
       {/* ── Moderation Error Toast ── */}
       {moderationError && (
-        <div className="bg-red-50 border border-red-200/60 rounded-2xl px-5 py-4 flex items-start gap-3">
-          <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200/60 dark:border-red-800/40 rounded-2xl px-5 py-4 flex items-start gap-3">
+          <div className="w-8 h-8 bg-red-100 dark:bg-red-900/40 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
             <span className="text-red-500 text-base">🚫</span>
           </div>
           <div className="flex-1">
-            <p className="text-sm font-extrabold text-red-700" style={{ fontFamily: '"Plus Jakarta Sans", sans-serif' }}>Post Blocked by Content Moderation</p>
-            <p className="text-xs text-red-600/80 font-medium mt-0.5">{moderationError}</p>
+            <p className="text-sm font-extrabold text-red-700 dark:text-red-400">Post Blocked by Content Moderation</p>
+            <p className="text-xs text-red-600/80 dark:text-red-400/80 font-medium mt-0.5">{moderationError}</p>
           </div>
           <button onClick={() => setModerationError(null)} className="text-red-400 hover:text-red-600 text-lg leading-none mt-0.5">&times;</button>
         </div>

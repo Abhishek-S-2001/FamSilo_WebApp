@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import useSWR from 'swr';
 import FeedCard, { Post } from './FeedCard';
-import { Loader2, Zap } from 'lucide-react';
+import { Zap } from 'lucide-react';
 import api from '@/lib/axios';
 import { supabase } from '@/lib/supabase';
 
@@ -14,18 +14,45 @@ interface FeedListProps {
   hideFilters?: boolean;
 }
 
+// ── Shimmer Skeleton Card ────────────────────────────────────────────────────
+function SkeletonCard() {
+  return (
+    <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-subtle)] dark:border-[var(--border-default)] p-5 flex flex-col gap-4 overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center gap-3">
+        <div className="skeleton w-10 h-10 rounded-full flex-shrink-0" />
+        <div className="flex flex-col gap-1.5 flex-1">
+          <div className="skeleton h-3.5 w-32 rounded" />
+          <div className="skeleton h-2.5 w-20 rounded" />
+        </div>
+      </div>
+      {/* Media placeholder */}
+      <div className="skeleton w-full aspect-[4/3] rounded-xl" />
+      {/* Caption */}
+      <div className="flex flex-col gap-2">
+        <div className="skeleton h-3 w-3/4 rounded" />
+        <div className="skeleton h-3 w-1/2 rounded" />
+      </div>
+      {/* Actions */}
+      <div className="flex gap-3 pt-1">
+        <div className="skeleton h-8 w-16 rounded-xl" />
+        <div className="skeleton h-8 w-16 rounded-xl" />
+        <div className="skeleton h-8 w-10 rounded-xl" />
+      </div>
+    </div>
+  );
+}
+
 export default function FeedList({ endpoint = '/posts/feed/home', hideFilters = false }: FeedListProps) {
   const [posts, setPosts] = useState<Post[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeFilterId, setActiveFilterId] = useState<string>('all');
 
-  // Fetch Silos for the filter pills (only if we need them)
   const { data: silos = [] } = useSWR(hideFilters ? null : '/silos', fetcher, {
     revalidateOnFocus: false,
     dedupingInterval: 60000,
   });
 
-  // Fetch Feed
   const fetchFeed = useCallback(async () => {
     try {
       const res = await api.get(endpoint);
@@ -45,14 +72,9 @@ export default function FeedList({ endpoint = '/posts/feed/home', hideFilters = 
 
         if (hasRealPath) {
           const { data } = supabase.storage.from('group-media').getPublicUrl(p.image_path);
-          if (postType === 'video') {
-            videoUrl = data?.publicUrl;
-          } else {
-            imageUrl = data?.publicUrl;
-          }
+          if (postType === 'video') videoUrl = data?.publicUrl;
+          else imageUrl = data?.publicUrl;
         }
-
-        const createdAt = p.created_at ? timeAgo(p.created_at) : 'Just now';
 
         return {
           id: p.id,
@@ -61,7 +83,7 @@ export default function FeedList({ endpoint = '/posts/feed/home', hideFilters = 
             name: profile.username || 'Family Member',
             avatar: profile.avatar_url || undefined,
           },
-          timestamp: createdAt,
+          timestamp: p.created_at ? timeAgo(p.created_at) : 'Just now',
           imageUrl,
           videoUrl,
           caption: p.caption || undefined,
@@ -94,84 +116,73 @@ export default function FeedList({ endpoint = '/posts/feed/home', hideFilters = 
     }
   }, [endpoint]);
 
-  useEffect(() => {
-    fetchFeed();
-  }, [fetchFeed]);
+  useEffect(() => { fetchFeed(); }, [fetchFeed]);
 
-  // Filter logic
   const displayedPosts = activeFilterId === 'all' || hideFilters
     ? posts
     : posts.filter((p: any) => p.siloId === activeFilterId);
 
+  const filterBtnBase = 'flex-shrink-0 px-5 py-2.5 rounded-full text-sm font-bold transition-all';
+  const filterActive = `${filterBtnBase} bg-[var(--text-primary)] text-white scale-105`;
+  const filterInactive = `${filterBtnBase} bg-[var(--bg-card)] border border-[var(--border-subtle)] text-[var(--text-muted)] hover:border-[var(--border-strong)] hover:text-[var(--text-secondary)]`;
+
   return (
     <div className="flex flex-col gap-4 max-w-2xl mx-auto w-full pt-4 md:pt-6">
-      {/* ── Filters ── */}
+
+      {/* ── Filter Pills ── */}
       {!hideFilters && silos.length > 0 && (
         <div className="flex items-center gap-2 overflow-x-auto pb-2 no-scrollbar px-1">
-          <button
-            onClick={() => setActiveFilterId('all')}
-            className={`flex-shrink-0 px-5 py-2.5 rounded-full text-sm font-bold transition-all shadow-sm ${activeFilterId === 'all'
-                ? 'bg-[#191c1e] text-white shadow-md scale-105'
-                : 'bg-white border border-[#f2f4f6] text-[#777587] hover:border-[#c7c4d8] hover:text-[#191c1e]'
-              }`}
-            style={{ fontFamily: '"Plus Jakarta Sans", sans-serif' }}
-          >
+          <button onClick={() => setActiveFilterId('all')}
+            className={activeFilterId === 'all' ? filterActive : filterInactive}>
             All Updates
           </button>
           {silos.map((silo: any) => (
-            <button
-              key={silo.id}
-              onClick={() => setActiveFilterId(silo.id)}
-              className={`flex-shrink-0 px-5 py-2.5 rounded-full text-sm font-bold transition-all shadow-sm ${activeFilterId === silo.id
-                  ? 'bg-[#191c1e] text-white shadow-md scale-105'
-                  : 'bg-white border border-[#f2f4f6] text-[#777587] hover:border-[#c7c4d8] hover:text-[#191c1e]'
-                }`}
-              style={{ fontFamily: '"Plus Jakarta Sans", sans-serif' }}
-            >
+            <button key={silo.id} onClick={() => setActiveFilterId(silo.id)}
+              className={activeFilterId === silo.id ? filterActive : filterInactive}>
               {silo.name}
             </button>
           ))}
         </div>
       )}
 
-      {/* ── Loading ── */}
+      {/* ── Shimmer Skeleton Loading ── */}
       {isLoading && (
-        <div className="flex justify-center py-12">
-          <Loader2 size={28} className="animate-spin text-[#0434c6]" />
+        <div className="flex flex-col gap-8 pb-32">
+          {[1, 2, 3].map(i => <SkeletonCard key={i} />)}
         </div>
       )}
 
       {/* ── Empty State ── */}
       {!isLoading && displayedPosts.length === 0 && (
         <div className="flex flex-col items-center justify-center py-16 text-center gap-3">
-          <div className="w-16 h-16 bg-[#f2f4f6] rounded-2xl flex items-center justify-center mb-2">
-            <Zap size={28} className="text-[#b5b3c3]" />
+          <div className="w-16 h-16 bg-[var(--bg-input)] rounded-2xl flex items-center justify-center mb-2">
+            <Zap size={28} className="text-[var(--text-faint)]" />
           </div>
-          <p className="text-lg font-extrabold text-[#191c1e]" style={{ fontFamily: '"Plus Jakarta Sans", sans-serif' }}>
-            Nothing to see here
-          </p>
-          <p className="text-sm text-[#777587] font-medium max-w-xs">
+          <p className="text-lg font-extrabold text-[var(--text-primary)]">Nothing to see here</p>
+          <p className="text-sm text-[var(--text-muted)] font-medium max-w-xs">
             There are no public posts in your silos matching this filter.
           </p>
         </div>
       )}
 
-      {/* ── Feed ── */}
-      <div className="flex flex-col gap-8 pb-32">
-        {!isLoading && displayedPosts.map(post => (
-          <FeedCard
-            key={post.id}
-            post={post}
-            showOriginSilo={true}
-            onDelete={(id) => setPosts(prev => prev.filter(p => p.id !== id))}
-          />
-        ))}
-      </div>
+      {/* ── Feed Cards ── */}
+      {!isLoading && (
+        <div className="flex flex-col gap-8 pb-32">
+          {displayedPosts.map((post, i) => (
+            <div key={post.id} style={{ animationDelay: `${i * 60}ms` }}>
+              <FeedCard
+                post={post}
+                showOriginSilo={true}
+                onDelete={(id) => setPosts(prev => prev.filter(p => p.id !== id))}
+              />
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
 
-// ── Helpers ──
 function timeAgo(dateString: string): string {
   const now = new Date();
   const past = new Date(dateString);

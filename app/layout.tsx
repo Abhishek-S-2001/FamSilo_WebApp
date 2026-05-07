@@ -1,16 +1,10 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist_Mono } from "next/font/google";
 import "./globals.css";
 
-// Import your new Providers wrapper and Chat Panel
 import Providers from '@/components/Providers';
 import GlobalChatWrapper from '@/components/chat/GlobalChatWrapper';
 import TermsGuard from '@/components/TermsGuard';
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
@@ -18,8 +12,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'FamSilo',
-  description: 'Your private family network.',
+  title: 'FamSilo — Your Private Family Network',
+  description: 'A secure, invite-only social platform for families to share memories, proposals, and moments privately.',
 };
 
 export default function RootLayout({
@@ -28,19 +22,18 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    // suppressHydrationWarning is required by next-themes to prevent
+    // the server/client mismatch on the `class` attribute of <html>
+    <html lang="en" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistMono.variable} antialiased`}
         suppressHydrationWarning
       >
         <Providers>
-          {/* Your page content wrapped in the T&C guard */}
           <TermsGuard>
-            {children} 
+            {children}
           </TermsGuard>
-          
-          {/* Your floating chat panel, now safely inside the Provider! */}
-          <GlobalChatWrapper /> 
+          <GlobalChatWrapper />
         </Providers>
       </body>
     </html>

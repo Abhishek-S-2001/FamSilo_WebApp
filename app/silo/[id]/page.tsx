@@ -23,14 +23,14 @@ export default function SiloDashboard() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-[#f7f9fb] flex items-center justify-center">
-        <Loader2 className="animate-spin text-[#0434c6]" size={32} />
+      <div className="min-h-screen bg-[var(--bg-page)] flex items-center justify-center">
+        <div className="skeleton w-10 h-10 rounded-full" />
       </div>
     );
   }
 
   return (
-    <div className="bg-gradient-to-br from-[#f0f4ff] to-[#f7f9fb] h-screen overflow-hidden font-sans text-[#191c1e]">
+    <div className="bg-[var(--bg-page)] h-screen overflow-hidden transition-colors duration-200">
       <TopNavbar />
       <main className="pt-20 md:pt-24 px-4 md:px-8 pb-0 max-w-[1920px] mx-auto grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-8 h-full relative">
 

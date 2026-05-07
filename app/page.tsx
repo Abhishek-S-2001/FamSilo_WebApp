@@ -17,7 +17,7 @@ export default function DashboardPage() {
   const firstName = rawName.split(' ')[0];
 
   return (
-    <div className="bg-gradient-to-br from-[#f0f4ff] to-[#f7f9fb] h-screen font-sans text-[#191c1e] overflow-hidden">
+    <div className="bg-[var(--bg-page)] h-screen text-[var(--text-primary)] overflow-hidden transition-colors duration-200">
       <TopNavbar />
 
       <main className="pt-20 md:pt-24 px-4 md:px-8 pb-0 max-w-[1920px] mx-auto grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-8 h-full relative">
