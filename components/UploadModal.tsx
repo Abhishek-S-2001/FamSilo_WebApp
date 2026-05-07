@@ -376,7 +376,7 @@ export default function UploadModal({
               </div>
 
               {/* Inline error */}
-              {errorMsg && phase !== 'error' && (
+              {errorMsg && (
                 <div className="flex items-start gap-2 p-3 bg-red-50 rounded-xl border border-red-100">
                   <ShieldAlert size={14} className="text-red-500 flex-shrink-0 mt-0.5" />
                   <p className="text-xs font-bold text-red-700">{errorMsg}</p>
